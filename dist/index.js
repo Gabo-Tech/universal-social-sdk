@@ -240,28 +240,139 @@ async function metaCall(params) {
   });
 }
 
-// src/utils/scheduler.ts
-var scheduledJobs = /* @__PURE__ */ new Map();
-function toDate(value) {
-  if (value instanceof Date) {
-    return value;
-  }
-  return new Date(value);
+// src/utils/normalizedResult.ts
+function normalizeActionResult(params) {
+  return {
+    platform: params.platform,
+    action: params.action,
+    success: true,
+    raw: params.raw
+  };
 }
+function normalizeDeleteResult(params) {
+  return {
+    platform: params.platform,
+    targetId: params.targetId,
+    deleted: true,
+    success: true,
+    raw: params.raw
+  };
+}
+function normalizeMutationResult(params) {
+  return {
+    platform: params.platform,
+    resourceId: params.resourceId,
+    success: true,
+    raw: params.raw
+  };
+}
+function normalizeDetailResult(params) {
+  return {
+    platform: params.platform,
+    success: true,
+    raw: params.raw
+  };
+}
+
+// src/queue/adapters/inMemory.ts
+function toEpochMs(value) {
+  return value instanceof Date ? value.getTime() : new Date(value).getTime();
+}
+var InMemoryQueueAdapter = class {
+  jobs = /* @__PURE__ */ new Map();
+  async enqueue(job) {
+    return this.schedule(job, /* @__PURE__ */ new Date());
+  }
+  async schedule(job, runAt) {
+    const targetTime = toEpochMs(runAt);
+    const delay = Math.max(0, targetTime - Date.now());
+    const result = new Promise((resolve, reject) => {
+      const timeout = setTimeout(async () => {
+        this.jobs.delete(job.id);
+        try {
+          resolve(await job.task());
+        } catch (error) {
+          reject(error);
+        }
+      }, delay);
+      this.jobs.set(job.id, { timeout, reject });
+    });
+    return {
+      id: job.id,
+      result
+    };
+  }
+  cancel(jobId) {
+    const scheduled = this.jobs.get(jobId);
+    if (!scheduled) {
+      return false;
+    }
+    clearTimeout(scheduled.timeout);
+    this.jobs.delete(jobId);
+    scheduled.reject(new Error(`Queue job cancelled: ${jobId}`));
+    return true;
+  }
+};
+
+// src/queue/adapters/bullmq.ts
+var BullMQAdapter = class {
+  async enqueue(job) {
+    throw new Error(
+      `BullMQAdapter.enqueue is a skeleton. Implement integration for job ${job.id}.`
+    );
+  }
+  async schedule(job, _runAt) {
+    throw new Error(
+      `BullMQAdapter.schedule is a skeleton. Implement integration for job ${job.id}.`
+    );
+  }
+  cancel(_jobId) {
+    throw new Error(
+      "BullMQAdapter.cancel is a skeleton. Implement cancellation mapping to BullMQ job IDs."
+    );
+  }
+};
+
+// src/queue/adapters/sqs.ts
+var SQSAdapter = class {
+  async enqueue(job) {
+    throw new Error(
+      `SQSAdapter.enqueue is a skeleton. Implement integration for job ${job.id}.`
+    );
+  }
+  async schedule(job, _runAt) {
+    throw new Error(
+      `SQSAdapter.schedule is a skeleton. Implement integration for job ${job.id}.`
+    );
+  }
+  cancel(_jobId) {
+    throw new Error(
+      "SQSAdapter.cancel is a skeleton. Implement cancellation strategy for queued messages."
+    );
+  }
+};
+
+// src/queue/registry.ts
+var queueAdapter = new InMemoryQueueAdapter();
+function setQueueAdapter(adapter) {
+  queueAdapter = adapter;
+}
+function getQueueAdapter() {
+  return queueAdapter;
+}
+function resetQueueAdapter() {
+  queueAdapter = new InMemoryQueueAdapter();
+}
+
+// src/utils/scheduler.ts
 function scheduleTask(params) {
-  const runAt = toDate(params.runAt).getTime();
-  const delay = Math.max(0, runAt - Date.now());
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(async () => {
-      scheduledJobs.delete(params.id);
-      try {
-        resolve(await params.task());
-      } catch (error) {
-        reject(error);
-      }
-    }, delay);
-    scheduledJobs.set(params.id, timeout);
-  });
+  return getQueueAdapter().schedule(
+    {
+      id: params.id,
+      task: params.task
+    },
+    params.runAt
+  ).then((handle) => handle.result);
 }
 
 // src/validation/platformSchemas.ts
@@ -763,28 +874,31 @@ var Instagram = class _Instagram {
   }
   static async hideComment(input) {
     validatePlatformInput("instagram", "hideComment", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "instagram",
       method: "POST",
       endpoint: `/${input.commentId}`,
       body: { hidden: input.hide }
     });
+    return normalizeActionResult({ platform: "instagram", action: "hideComment", raw });
   }
   static async deleteComment(input) {
     validatePlatformInput("instagram", "deleteComment", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "instagram",
       method: "DELETE",
       endpoint: `/${input.commentId}`
     });
+    return normalizeDeleteResult({ platform: "instagram", targetId: input.commentId, raw });
   }
   static async deleteMedia(input) {
     validatePlatformInput("instagram", "deleteMedia", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "instagram",
       method: "DELETE",
       endpoint: `/${input.mediaId}`
     });
+    return normalizeDeleteResult({ platform: "instagram", targetId: input.mediaId, raw });
   }
   static async sendPrivateReply(input) {
     validatePlatformInput("instagram", "sendPrivateReply", input);
@@ -820,12 +934,13 @@ var Instagram = class _Instagram {
   static async getPublishingLimit(input) {
     validatePlatformInput("instagram", "getPublishingLimit", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
-    return metaCall({
+    const raw = await metaCall({
       platform: "instagram",
       method: "GET",
       endpoint: `/${igUserId}/content_publishing_limit`,
       query: { fields: "quota_usage,config" }
     });
+    return normalizeDetailResult({ platform: "instagram", raw });
   }
   static async scheduleReel(input) {
     validatePlatformInput("instagram", "scheduleReel", input);
@@ -932,47 +1047,52 @@ var X = class _X {
   static async deleteTweet(input) {
     validatePlatformInput("x", "deleteTweet", input);
     const rw = getClient().readWrite;
-    return withRetries({
+    const raw = await withRetries({
       platform: "x",
       endpoint: "DELETE /2/tweets/:id",
       execute: async () => rw.v2.deleteTweet(input.tweetId)
     });
+    return normalizeDeleteResult({ platform: "x", targetId: input.tweetId, raw });
   }
   static async retweet(input) {
     validatePlatformInput("x", "retweet", input);
     const rw = getClient().readWrite;
-    return withRetries({
+    const raw = await withRetries({
       platform: "x",
       endpoint: "POST /2/users/:id/retweets",
       execute: async () => rw.v2.retweet(input.userId, input.tweetId)
     });
+    return normalizeActionResult({ platform: "x", action: "retweet", raw });
   }
   static async unretweet(input) {
     validatePlatformInput("x", "unretweet", input);
     const rw = getClient().readWrite;
-    return withRetries({
+    const raw = await withRetries({
       platform: "x",
       endpoint: "DELETE /2/users/:id/retweets/:tweet_id",
       execute: async () => rw.v2.unretweet(input.userId, input.tweetId)
     });
+    return normalizeActionResult({ platform: "x", action: "unretweet", raw });
   }
   static async likeTweet(input) {
     validatePlatformInput("x", "likeTweet", input);
     const rw = getClient().readWrite;
-    return withRetries({
+    const raw = await withRetries({
       platform: "x",
       endpoint: "POST /2/users/:id/likes",
       execute: async () => rw.v2.like(input.userId, input.tweetId)
     });
+    return normalizeActionResult({ platform: "x", action: "like", raw });
   }
   static async unlikeTweet(input) {
     validatePlatformInput("x", "unlikeTweet", input);
     const rw = getClient().readWrite;
-    return withRetries({
+    const raw = await withRetries({
       platform: "x",
       endpoint: "DELETE /2/users/:id/likes/:tweet_id",
       execute: async () => rw.v2.unlike(input.userId, input.tweetId)
     });
+    return normalizeActionResult({ platform: "x", action: "unlike", raw });
   }
   static async uploadMedia(input) {
     validatePlatformInput("x", "uploadMedia", input);
@@ -1006,13 +1126,14 @@ var X = class _X {
   static async sendDirectMessage(input) {
     validatePlatformInput("x", "sendDirectMessage", input);
     const rw = getClient().readWrite;
-    return withRetries({
+    const raw = await withRetries({
       platform: "x",
       endpoint: "POST /2/dm_conversations/with/:participant_id/messages",
       execute: async () => rw.v2.post(`dm_conversations/with/${input.recipientId}/messages`, {
         text: input.text
       })
     });
+    return normalizeActionResult({ platform: "x", action: "sendDirectMessage", raw });
   }
   static async getTweetAnalytics(input) {
     validatePlatformInput("x", "getTweetAnalytics", input);
@@ -1155,24 +1276,26 @@ var Facebook = class {
   }
   static async likeObject(input) {
     validatePlatformInput("facebook", "likeObject", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "facebook",
       method: "POST",
       endpoint: `/${input.objectId}/likes`
     });
+    return normalizeActionResult({ platform: "facebook", action: "likeObject", raw });
   }
   static async deletePost(input) {
     validatePlatformInput("facebook", "deletePost", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "facebook",
       method: "DELETE",
       endpoint: `/${input.objectId}`
     });
+    return normalizeDeleteResult({ platform: "facebook", targetId: input.objectId, raw });
   }
   static async sendPageMessage(input) {
     validatePlatformInput("facebook", "sendPageMessage", input);
     const pageId = pageIdOrThrow(input.pageId);
-    return metaCall({
+    const raw = await metaCall({
       platform: "facebook",
       method: "POST",
       endpoint: `/${pageId}/messages`,
@@ -1182,6 +1305,7 @@ var Facebook = class {
         messaging_type: "RESPONSE"
       }
     });
+    return normalizeActionResult({ platform: "facebook", action: "sendPageMessage", raw });
   }
   static async getPostInsights(input) {
     validatePlatformInput("facebook", "getPostInsights", input);
@@ -1208,7 +1332,7 @@ var Facebook = class {
   static async uploadResumableVideo(input) {
     validatePlatformInput("facebook", "uploadResumableVideo", input);
     const pageId = pageIdOrThrow(input.pageId);
-    return metaCall({
+    const raw = await metaCall({
       platform: "facebook",
       method: "POST",
       endpoint: `/${pageId}/videos`,
@@ -1218,6 +1342,7 @@ var Facebook = class {
         start_offset: input.startOffset ?? 0
       }
     });
+    return normalizeMutationResult({ platform: "facebook", raw });
   }
   static async listPublishedPosts(input) {
     validatePlatformInput("facebook", "listPublishedPosts", input);
@@ -1427,33 +1552,44 @@ var LinkedIn = class _LinkedIn {
   }
   static async deleteComment(input) {
     validatePlatformInput("linkedin", "deleteComment", input);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: `/socialActions/comments/${encodeURIComponent(input.encodedCommentUrn)}`,
       method: "DELETE"
+    });
+    return normalizeDeleteResult({
+      platform: "linkedin",
+      targetId: input.encodedCommentUrn,
+      raw
     });
   }
   static async likePost(input) {
     validatePlatformInput("linkedin", "likePost", input);
     const actor = authorOrThrow(input.actor);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: "/socialActions/likes",
       method: "POST",
       data: { actor, object: input.objectUrn }
     });
+    return normalizeActionResult({ platform: "linkedin", action: "likePost", raw });
   }
   static async unlikePost(input) {
     validatePlatformInput("linkedin", "unlikePost", input);
     const actorUrn = authorOrThrow(input.actorUrn);
     const encodedActor = encodeURIComponent(actorUrn);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: `/socialActions/${encodeURIComponent(input.encodedObjectUrn)}/likes/${encodedActor}`,
       method: "DELETE"
+    });
+    return normalizeDeleteResult({
+      platform: "linkedin",
+      targetId: input.encodedObjectUrn,
+      raw
     });
   }
   static async sendDirectMessage(input) {
     validatePlatformInput("linkedin", "sendDirectMessage", input);
     const actor = authorOrThrow(input.actor);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: "/messages",
       method: "POST",
       data: {
@@ -1462,6 +1598,7 @@ var LinkedIn = class _LinkedIn {
         body: input.text
       }
     });
+    return normalizeActionResult({ platform: "linkedin", action: "sendDirectMessage", raw });
   }
   static async getPostAnalytics(input) {
     validatePlatformInput("linkedin", "getPostAnalytics", input);
@@ -1515,7 +1652,7 @@ var LinkedIn = class _LinkedIn {
     validatePlatformInput("linkedin", "uploadBinary", input);
     const { fileSize } = getFileMeta(input.mediaPath);
     await getLinkedInAccessToken();
-    return withRetries({
+    await withRetries({
       platform: "linkedin",
       endpoint: "uploadBinary",
       execute: async () => axios2.put(input.uploadUrl, createUploadStream(input.mediaPath), {
@@ -1526,12 +1663,18 @@ var LinkedIn = class _LinkedIn {
         }
       })
     });
+    return { bytesUploaded: fileSize };
   }
   static async deletePost(input) {
     validatePlatformInput("linkedin", "deletePost", input);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: `/posts/${encodeURIComponent(input.encodedPostUrn)}`,
       method: "DELETE"
+    });
+    return normalizeDeleteResult({
+      platform: "linkedin",
+      targetId: input.encodedPostUrn,
+      raw
     });
   }
 };
@@ -1599,7 +1742,7 @@ var YouTube = class _YouTube {
   static async uploadBinary(input) {
     validatePlatformInput("youtube", "uploadBinary", input);
     const { fileSize } = getFileMeta(input.mediaPath);
-    return withRetries({
+    await withRetries({
       platform: "youtube",
       endpoint: "uploadBinary",
       execute: async () => axios3.put(input.uploadUrl, createUploadStream(input.mediaPath), {
@@ -1611,6 +1754,7 @@ var YouTube = class _YouTube {
         }
       })
     });
+    return { bytesUploaded: fileSize };
   }
   static async listMyVideos(input) {
     validatePlatformInput("youtube", "listMyVideos", input);
@@ -1627,7 +1771,7 @@ var YouTube = class _YouTube {
   }
   static async updateVideoMetadata(input) {
     validatePlatformInput("youtube", "updateVideoMetadata", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/videos",
       method: "PUT",
       query: { part: "snippet,status" },
@@ -1642,18 +1786,24 @@ var YouTube = class _YouTube {
         }
       }
     });
+    return normalizeMutationResult({
+      platform: "youtube",
+      resourceId: input.videoId,
+      raw
+    });
   }
   static async deleteVideo(input) {
     validatePlatformInput("youtube", "deleteVideo", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/videos",
       method: "DELETE",
       query: { id: input.videoId }
     });
+    return normalizeDeleteResult({ platform: "youtube", targetId: input.videoId, raw });
   }
   static async commentOnVideo(input) {
     validatePlatformInput("youtube", "commentOnVideo", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/commentThreads",
       method: "POST",
       query: { part: "snippet" },
@@ -1666,10 +1816,11 @@ var YouTube = class _YouTube {
         }
       }
     });
+    return normalizeMutationResult({ platform: "youtube", resourceId: input.videoId, raw });
   }
   static async replyToComment(input) {
     validatePlatformInput("youtube", "replyToComment", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/comments",
       method: "POST",
       query: { part: "snippet" },
@@ -1680,22 +1831,29 @@ var YouTube = class _YouTube {
         }
       }
     });
+    return normalizeMutationResult({
+      platform: "youtube",
+      resourceId: input.parentCommentId,
+      raw
+    });
   }
   static async likeVideo(input) {
     validatePlatformInput("youtube", "likeVideo", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/videos/rate",
       method: "POST",
       query: { id: input.videoId, rating: "like" }
     });
+    return normalizeActionResult({ platform: "youtube", action: "likeVideo", raw });
   }
   static async unlikeVideo(input) {
     validatePlatformInput("youtube", "unlikeVideo", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/videos/rate",
       method: "POST",
       query: { id: input.videoId, rating: "none" }
     });
+    return normalizeActionResult({ platform: "youtube", action: "unlikeVideo", raw });
   }
   static async createPlaylist(input) {
     validatePlatformInput("youtube", "createPlaylist", input);
@@ -1857,43 +2015,48 @@ var TikTok = class _TikTok {
   }
   static async deleteVideo(input) {
     validatePlatformInput("tiktok", "deleteVideo", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/delete/",
       method: "POST",
       data: { video_id: input.videoId }
     });
+    return normalizeDeleteResult({ platform: "tiktok", targetId: input.videoId, raw });
   }
   static async commentOnVideo(input) {
     validatePlatformInput("tiktok", "commentOnVideo", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/comment/create/",
       method: "POST",
       data: { video_id: input.videoId, text: input.text }
     });
+    return normalizeActionResult({ platform: "tiktok", action: "commentOnVideo", raw });
   }
   static async replyToComment(input) {
     validatePlatformInput("tiktok", "replyToComment", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/comment/reply/",
       method: "POST",
       data: { comment_id: input.commentId, text: input.text }
     });
+    return normalizeActionResult({ platform: "tiktok", action: "replyToComment", raw });
   }
   static async likeVideo(input) {
     validatePlatformInput("tiktok", "likeVideo", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/like/",
       method: "POST",
       data: { video_id: input.videoId }
     });
+    return normalizeActionResult({ platform: "tiktok", action: "likeVideo", raw });
   }
   static async unlikeVideo(input) {
     validatePlatformInput("tiktok", "unlikeVideo", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/unlike/",
       method: "POST",
       data: { video_id: input.videoId }
     });
+    return normalizeActionResult({ platform: "tiktok", action: "unlikeVideo", raw });
   }
   static async getVideoAnalytics(input) {
     validatePlatformInput("tiktok", "getVideoAnalytics", input);
@@ -1970,7 +2133,7 @@ async function pinterestRequest(params) {
 var Pinterest = class _Pinterest {
   static async createPin(input) {
     validatePlatformInput("pinterest", "createPin", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: "/pins",
       method: "POST",
       data: {
@@ -1984,10 +2147,11 @@ var Pinterest = class _Pinterest {
         }
       }
     });
+    return normalizeMutationResult({ platform: "pinterest", raw });
   }
   static async createVideoPin(input) {
     validatePlatformInput("pinterest", "createVideoPin", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: "/pins",
       method: "POST",
       data: {
@@ -2000,10 +2164,11 @@ var Pinterest = class _Pinterest {
         }
       }
     });
+    return normalizeMutationResult({ platform: "pinterest", raw });
   }
   static async updatePin(input) {
     validatePlatformInput("pinterest", "updatePin", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: `/pins/${input.pinId}`,
       method: "PATCH",
       data: {
@@ -2012,13 +2177,19 @@ var Pinterest = class _Pinterest {
         link: input.link
       }
     });
+    return normalizeMutationResult({
+      platform: "pinterest",
+      resourceId: input.pinId,
+      raw
+    });
   }
   static async deletePin(input) {
     validatePlatformInput("pinterest", "deletePin", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: `/pins/${input.pinId}`,
       method: "DELETE"
     });
+    return normalizeDeleteResult({ platform: "pinterest", targetId: input.pinId, raw });
   }
   static async listPins(input) {
     validatePlatformInput("pinterest", "listPins", input);
@@ -2033,7 +2204,7 @@ var Pinterest = class _Pinterest {
   }
   static async createBoard(input) {
     validatePlatformInput("pinterest", "createBoard", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: "/boards",
       method: "POST",
       data: {
@@ -2042,6 +2213,7 @@ var Pinterest = class _Pinterest {
         privacy: input.privacy ?? "PUBLIC"
       }
     });
+    return normalizeMutationResult({ platform: "pinterest", raw });
   }
   static async listBoards(input) {
     validatePlatformInput("pinterest", "listBoards", input);
@@ -2053,18 +2225,24 @@ var Pinterest = class _Pinterest {
   }
   static async commentOnPin(input) {
     validatePlatformInput("pinterest", "commentOnPin", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: `/pins/${input.pinId}/comments`,
       method: "POST",
       data: { text: input.text }
     });
+    return normalizeActionResult({ platform: "pinterest", action: "commentOnPin", raw });
   }
   static async replyToComment(input) {
     validatePlatformInput("pinterest", "replyToComment", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: `/pins/${input.pinId}/comments/${input.commentId}/replies`,
       method: "POST",
       data: { text: input.text }
+    });
+    return normalizeActionResult({
+      platform: "pinterest",
+      action: "replyToComment",
+      raw
     });
   }
   static async getPinAnalytics(input) {
@@ -2085,7 +2263,7 @@ var Pinterest = class _Pinterest {
   }
   static async schedulePin(input) {
     validatePlatformInput("pinterest", "schedulePin", input);
-    return scheduleTask({
+    const raw = await scheduleTask({
       id: `pinterest-schedule-${Date.now()}`,
       runAt: input.publishAt,
       task: async () => _Pinterest.createPin({
@@ -2094,6 +2272,7 @@ var Pinterest = class _Pinterest {
         boardId: input.boardId
       })
     });
+    return normalizeMutationResult({ platform: "pinterest", raw });
   }
 };
 
@@ -2217,7 +2396,7 @@ ${input.url}`,
     const parsed = new URL(input.uri.replace("at://", "https://"));
     const parts = parsed.pathname.split("/").filter(Boolean);
     const [collection, rkey] = parts.slice(-2);
-    return bskyRequest({
+    const raw = await bskyRequest({
       endpoint: "/com.atproto.repo.deleteRecord",
       method: "POST",
       data: {
@@ -2226,6 +2405,7 @@ ${input.url}`,
         rkey
       }
     });
+    return normalizeActionResult({ platform: "bluesky", action: "deleteRecord", raw });
   }
   static async getAuthorFeed(input) {
     validatePlatformInput("bluesky", "getAuthorFeed", input);
@@ -2340,13 +2520,20 @@ var Mastodon = class _Mastodon {
     return withRetries({
       platform: "mastodon",
       endpoint: "/media",
-      execute: async () => axios7.post(`${baseUrl()}/api/v2/media`, createUploadStream(input.mediaPath), {
-        headers: mastodonHeaders({
-          "Content-Length": String(fileSize),
-          "Content-Type": "application/octet-stream"
-        }),
-        maxBodyLength: Infinity
-      })
+      execute: async () => {
+        const response = await axios7.post(
+          `${baseUrl()}/api/v2/media`,
+          createUploadStream(input.mediaPath),
+          {
+            headers: mastodonHeaders({
+              "Content-Length": String(fileSize),
+              "Content-Type": "application/octet-stream"
+            }),
+            maxBodyLength: Infinity
+          }
+        );
+        return response.data;
+      }
     });
   }
   static async createMediaStatus(input) {
@@ -2374,10 +2561,11 @@ var Mastodon = class _Mastodon {
   }
   static async deleteStatus(input) {
     validatePlatformInput("mastodon", "deleteStatus", input);
-    return mastodonRequest({
+    const raw = await mastodonRequest({
       endpoint: `/statuses/${input.statusId}`,
       method: "DELETE"
     });
+    return normalizeDeleteResult({ platform: "mastodon", targetId: input.statusId, raw });
   }
   static async favouriteStatus(input) {
     validatePlatformInput("mastodon", "favouriteStatus", input);
@@ -2432,11 +2620,12 @@ var Mastodon = class _Mastodon {
   }
   static async getAccountAnalytics(input) {
     validatePlatformInput("mastodon", "getAccountAnalytics", input);
-    return mastodonRequest({
+    const raw = await mastodonRequest({
       endpoint: "/accounts/verify_credentials",
       method: "GET",
       query: { scope: input.instanceScope ?? "day" }
     });
+    return normalizeDetailResult({ platform: "mastodon", raw });
   }
   static async scheduleStatus(input) {
     validatePlatformInput("mastodon", "scheduleStatus", input);
@@ -2568,20 +2757,22 @@ var Threads = class _Threads {
   }
   static async deleteThread(input) {
     validatePlatformInput("threads", "deleteThread", input);
-    return threadsRequest({
+    const raw = await threadsRequest({
       endpoint: `/${input.threadId}`,
       method: "DELETE"
     });
+    return normalizeDeleteResult({ platform: "threads", targetId: input.threadId, raw });
   }
   static async getThread(input) {
     validatePlatformInput("threads", "getThread", input);
-    return threadsRequest({
+    const raw = await threadsRequest({
       endpoint: `/${input.threadId}`,
       method: "GET",
       query: {
         fields: (input.fields ?? ["id", "text", "timestamp", "permalink"]).join(",")
       }
     });
+    return normalizeDetailResult({ platform: "threads", raw });
   }
   static async listMyThreads(input) {
     validatePlatformInput("threads", "listMyThreads", input);
@@ -2616,17 +2807,19 @@ var Threads = class _Threads {
   }
   static async likeThread(input) {
     validatePlatformInput("threads", "likeThread", input);
-    return threadsRequest({
+    const raw = await threadsRequest({
       endpoint: `/${input.threadId}/likes`,
       method: "POST"
     });
+    return normalizeActionResult({ platform: "threads", action: "likeThread", raw });
   }
   static async unlikeThread(input) {
     validatePlatformInput("threads", "unlikeThread", input);
-    return threadsRequest({
+    const raw = await threadsRequest({
       endpoint: `/${input.threadId}/likes`,
       method: "DELETE"
     });
+    return normalizeDeleteResult({ platform: "threads", targetId: input.threadId, raw });
   }
   static async scheduleTextPost(input) {
     validatePlatformInput("threads", "scheduleTextPost", input);
@@ -2640,17 +2833,220 @@ var Threads = class _Threads {
     });
   }
 };
+
+// src/webhooks/signature.ts
+import { createHmac, timingSafeEqual } from "crypto";
+function toBuffer(value) {
+  return Buffer.from(value, "utf8");
+}
+function safeCompare(a, b) {
+  const aBuf = toBuffer(a);
+  const bBuf = toBuffer(b);
+  if (aBuf.length !== bBuf.length) {
+    return false;
+  }
+  return timingSafeEqual(aBuf, bBuf);
+}
+function normalizePayload(payload) {
+  return typeof payload === "string" ? payload : payload.toString("utf8");
+}
+function verifyMetaWebhookSignature(params) {
+  if (!params.signatureHeader || !params.appSecret) {
+    return false;
+  }
+  const payload = normalizePayload(params.payload);
+  const digest = createHmac("sha256", params.appSecret).update(payload).digest("hex");
+  const expected = `sha256=${digest}`;
+  return safeCompare(expected, params.signatureHeader.trim());
+}
+function verifyXWebhookSignature(params) {
+  if (!params.signatureHeader || !params.consumerSecret) {
+    return false;
+  }
+  const payload = normalizePayload(params.payload);
+  const digest = createHmac("sha256", params.consumerSecret).update(payload).digest("base64");
+  const header = params.signatureHeader.trim().replace(/^sha256=/i, "");
+  return safeCompare(digest, header);
+}
+
+// src/webhooks/normalize.ts
+function asRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value;
+}
+function normalizeMetaWebhook(body) {
+  const root = asRecord(body);
+  const entries = Array.isArray(root?.entry) ? root?.entry : [];
+  const events = [];
+  for (const entry of entries) {
+    const entryRecord = asRecord(entry);
+    const entryId = typeof entryRecord?.id === "string" ? entryRecord.id : void 0;
+    const timestamp = typeof entryRecord?.time === "number" ? entryRecord.time : void 0;
+    const changes = Array.isArray(entryRecord?.changes) ? entryRecord.changes : [];
+    for (const change of changes) {
+      const changeRecord = asRecord(change);
+      const field = typeof changeRecord?.field === "string" ? changeRecord.field : "change";
+      events.push({
+        platform: "meta",
+        type: `meta.${field}`,
+        id: entryId,
+        timestamp,
+        payload: changeRecord?.value ?? changeRecord,
+        raw: body
+      });
+    }
+    const messaging = Array.isArray(entryRecord?.messaging) ? entryRecord.messaging : [];
+    for (const item of messaging) {
+      events.push({
+        platform: "meta",
+        type: "meta.messaging",
+        id: entryId,
+        timestamp,
+        payload: item,
+        raw: body
+      });
+    }
+  }
+  if (events.length === 0) {
+    events.push({
+      platform: "meta",
+      type: "meta.unknown",
+      payload: body,
+      raw: body
+    });
+  }
+  return events;
+}
+function normalizeXWebhook(body) {
+  const root = asRecord(body);
+  if (!root) {
+    return [
+      {
+        platform: "x",
+        type: "x.unknown",
+        payload: body,
+        raw: body
+      }
+    ];
+  }
+  const events = [];
+  for (const [key, value] of Object.entries(root)) {
+    if (key === "for_user_id") {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        events.push({
+          platform: "x",
+          type: `x.${key}`,
+          payload: item,
+          raw: body
+        });
+      }
+      continue;
+    }
+    events.push({
+      platform: "x",
+      type: `x.${key}`,
+      payload: value,
+      raw: body
+    });
+  }
+  if (events.length === 0) {
+    events.push({
+      platform: "x",
+      type: "x.unknown",
+      payload: body,
+      raw: body
+    });
+  }
+  return events;
+}
+function normalizeWebhook(platform, body) {
+  if (platform === "meta") {
+    return normalizeMetaWebhook(body);
+  }
+  return normalizeXWebhook(body);
+}
+
+// src/webhooks/router.ts
+var WebhookRouter = class {
+  handlers = /* @__PURE__ */ new Map();
+  on(type, handler) {
+    const existing = this.handlers.get(type) ?? [];
+    existing.push(handler);
+    this.handlers.set(type, existing);
+    return this;
+  }
+  async dispatch(events) {
+    for (const event of events) {
+      const typedHandlers = this.handlers.get(event.type) ?? [];
+      const wildcardHandlers = this.handlers.get("*") ?? [];
+      for (const handler of [...typedHandlers, ...wildcardHandlers]) {
+        await handler(event);
+      }
+    }
+  }
+  async handle(platform, body) {
+    const events = normalizeWebhook(platform, body);
+    await this.dispatch(events);
+  }
+  async handleMeta(params) {
+    const valid = verifyMetaWebhookSignature({
+      payload: params.payload,
+      signatureHeader: params.signatureHeader,
+      appSecret: params.appSecret
+    });
+    if (!valid) {
+      throw new SocialError({
+        platform: "facebook",
+        endpoint: "webhooks.meta.verify",
+        message: "Invalid Meta webhook signature."
+      });
+    }
+    await this.handle("meta", params.body);
+  }
+  async handleX(params) {
+    const valid = verifyXWebhookSignature({
+      payload: params.payload,
+      signatureHeader: params.signatureHeader,
+      consumerSecret: params.consumerSecret
+    });
+    if (!valid) {
+      throw new SocialError({
+        platform: "x",
+        endpoint: "webhooks.x.verify",
+        message: "Invalid X webhook signature."
+      });
+    }
+    await this.handle("x", params.body);
+  }
+};
 export {
   Bluesky,
+  BullMQAdapter,
   Facebook,
+  InMemoryQueueAdapter,
   Instagram,
   LinkedIn,
   Mastodon,
   Pinterest,
+  SQSAdapter,
   SocialError,
   Threads,
   TikTok,
+  WebhookRouter,
   X,
-  YouTube
+  YouTube,
+  getQueueAdapter,
+  normalizeMetaWebhook,
+  normalizeWebhook,
+  normalizeXWebhook,
+  resetQueueAdapter,
+  setQueueAdapter,
+  verifyMetaWebhookSignature,
+  verifyXWebhookSignature
 };
 //# sourceMappingURL=index.js.map

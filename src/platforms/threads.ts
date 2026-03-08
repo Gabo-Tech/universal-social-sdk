@@ -1,9 +1,22 @@
 import axios from "axios";
 import { env } from "../config/env.js";
 import { SocialError } from "../errors/SocialError.js";
+import {
+  normalizeActionResult,
+  normalizeDeleteResult,
+  normalizeDetailResult
+} from "../utils/normalizedResult.js";
 import { withRetries } from "../utils/retry.js";
 import { scheduleTask } from "../utils/scheduler.js";
 import { validatePlatformInput } from "../validation/platformSchemas.js";
+import type {
+  ThreadsActionResult,
+  ThreadsDeleteResult,
+  ThreadsInsightsResult,
+  ThreadsListResult,
+  ThreadsPublishResult,
+  ThreadsThreadResult
+} from "../responseTypes.js";
 
 function graphBase() {
   return `https://graph.facebook.com/${env.meta.graphVersion}`;
@@ -87,8 +100,11 @@ async function createContainer(params: {
   });
 }
 
-async function publishContainer(threadsUserId: string, creationId: string) {
-  return threadsRequest({
+async function publishContainer(
+  threadsUserId: string,
+  creationId: string
+): Promise<ThreadsPublishResult> {
+  return threadsRequest<ThreadsPublishResult>({
     endpoint: `/${threadsUserId}/threads_publish`,
     method: "POST",
     data: { creation_id: creationId }
@@ -96,7 +112,10 @@ async function publishContainer(threadsUserId: string, creationId: string) {
 }
 
 export class Threads {
-  static async postText(input: { threadsUserId?: string; text: string }) {
+  static async postText(input: {
+    threadsUserId?: string;
+    text: string;
+  }): Promise<ThreadsPublishResult> {
     validatePlatformInput("threads", "postText", input);
     const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
     const container = await createContainer({
@@ -111,7 +130,7 @@ export class Threads {
     threadsUserId?: string;
     text?: string;
     imageUrl: string;
-  }) {
+  }): Promise<ThreadsPublishResult> {
     validatePlatformInput("threads", "postImage", input);
     const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
     const container = await createContainer({
@@ -127,7 +146,7 @@ export class Threads {
     threadsUserId?: string;
     text?: string;
     videoUrl: string;
-  }) {
+  }): Promise<ThreadsPublishResult> {
     validatePlatformInput("threads", "postVideo", input);
     const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
     const container = await createContainer({
@@ -143,7 +162,7 @@ export class Threads {
     threadsUserId?: string;
     threadId: string;
     text: string;
-  }) {
+  }): Promise<ThreadsPublishResult> {
     validatePlatformInput("threads", "replyToThread", input);
     const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
     const container = await createContainer({
@@ -155,38 +174,51 @@ export class Threads {
     return publishContainer(threadsUserId, container.id);
   }
 
-  static async deleteThread(input: { threadId: string }) {
+  static async deleteThread(
+    input: { threadId: string }
+  ): Promise<ThreadsDeleteResult> {
     validatePlatformInput("threads", "deleteThread", input);
-    return threadsRequest({
+    const raw = await threadsRequest({
       endpoint: `/${input.threadId}`,
       method: "DELETE"
     });
+    return normalizeDeleteResult({ platform: "threads", targetId: input.threadId, raw });
   }
 
-  static async getThread(input: { threadId: string; fields?: string[] }) {
+  static async getThread(input: {
+    threadId: string;
+    fields?: string[];
+  }): Promise<ThreadsThreadResult> {
     validatePlatformInput("threads", "getThread", input);
-    return threadsRequest({
+    const raw = await threadsRequest({
       endpoint: `/${input.threadId}`,
       method: "GET",
       query: {
         fields: (input.fields ?? ["id", "text", "timestamp", "permalink"]).join(",")
       }
     });
+    return normalizeDetailResult({ platform: "threads", raw });
   }
 
-  static async listMyThreads(input: { threadsUserId?: string; limit?: number }) {
+  static async listMyThreads(input: {
+    threadsUserId?: string;
+    limit?: number;
+  }): Promise<ThreadsListResult> {
     validatePlatformInput("threads", "listMyThreads", input);
     const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
-    return threadsRequest({
+    return threadsRequest<ThreadsListResult>({
       endpoint: `/${threadsUserId}/threads`,
       method: "GET",
       query: { limit: input.limit ?? 25 }
     });
   }
 
-  static async getThreadInsights(input: { threadId: string; metrics?: string[] }) {
+  static async getThreadInsights(input: {
+    threadId: string;
+    metrics?: string[];
+  }): Promise<ThreadsInsightsResult> {
     validatePlatformInput("threads", "getThreadInsights", input);
-    return threadsRequest({
+    return threadsRequest<ThreadsInsightsResult>({
       endpoint: `/${input.threadId}/insights`,
       method: "GET",
       query: {
@@ -199,10 +231,10 @@ export class Threads {
     threadsUserId?: string;
     metrics?: string[];
     period?: "day" | "week" | "days_28";
-  }) {
+  }): Promise<ThreadsInsightsResult> {
     validatePlatformInput("threads", "getAccountInsights", input);
     const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
-    return threadsRequest({
+    return threadsRequest<ThreadsInsightsResult>({
       endpoint: `/${threadsUserId}/threads_insights`,
       method: "GET",
       query: {
@@ -212,27 +244,33 @@ export class Threads {
     });
   }
 
-  static async likeThread(input: { threadId: string }) {
+  static async likeThread(input: {
+    threadId: string;
+  }): Promise<ThreadsActionResult> {
     validatePlatformInput("threads", "likeThread", input);
-    return threadsRequest({
+    const raw = await threadsRequest({
       endpoint: `/${input.threadId}/likes`,
       method: "POST"
     });
+    return normalizeActionResult({ platform: "threads", action: "likeThread", raw });
   }
 
-  static async unlikeThread(input: { threadId: string }) {
+  static async unlikeThread(input: {
+    threadId: string;
+  }): Promise<ThreadsDeleteResult> {
     validatePlatformInput("threads", "unlikeThread", input);
-    return threadsRequest({
+    const raw = await threadsRequest({
       endpoint: `/${input.threadId}/likes`,
       method: "DELETE"
     });
+    return normalizeDeleteResult({ platform: "threads", targetId: input.threadId, raw });
   }
 
   static async scheduleTextPost(input: {
     threadsUserId?: string;
     text: string;
     publishAt: Date | string;
-  }) {
+  }): Promise<ThreadsPublishResult> {
     validatePlatformInput("threads", "scheduleTextPost", input);
     return scheduleTask({
       id: `threads-schedule-${Date.now()}`,

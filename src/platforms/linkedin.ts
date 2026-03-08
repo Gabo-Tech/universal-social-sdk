@@ -2,6 +2,10 @@ import axios from "axios";
 import { env } from "../config/env.js";
 import { SocialError } from "../errors/SocialError.js";
 import { createUploadStream, getFileMeta } from "../utils/file.js";
+import {
+  normalizeActionResult,
+  normalizeDeleteResult
+} from "../utils/normalizedResult.js";
 import { withRetries } from "../utils/retry.js";
 import { scheduleTask } from "../utils/scheduler.js";
 import {
@@ -9,6 +13,14 @@ import {
   getLinkedInHeaders
 } from "./shared/linkedinAuth.js";
 import { validatePlatformInput } from "../validation/platformSchemas.js";
+import type {
+  LinkedInActionResult,
+  LinkedInAnalyticsResult,
+  LinkedInBinaryUploadResult,
+  LinkedInDeleteResult,
+  LinkedInPostResult,
+  LinkedInUploadRegistrationResult
+} from "../responseTypes.js";
 
 const BASE_URL = "https://api.linkedin.com/rest";
 
@@ -58,7 +70,11 @@ async function linkedInRequest<T = unknown>(params: {
 }
 
 export class LinkedIn {
-  static async createTextPost(input: { author?: string; text: string; visibility?: "PUBLIC" | "CONNECTIONS" }) {
+  static async createTextPost(input: {
+    author?: string;
+    text: string;
+    visibility?: "PUBLIC" | "CONNECTIONS";
+  }): Promise<LinkedInPostResult> {
     validatePlatformInput("linkedin", "createTextPost", input);
     const author = authorOrThrow(input.author);
     return linkedInRequest({
@@ -75,7 +91,11 @@ export class LinkedIn {
     });
   }
 
-  static async createImagePost(input: { author?: string; text: string; mediaUrn: string }) {
+  static async createImagePost(input: {
+    author?: string;
+    text: string;
+    mediaUrn: string;
+  }): Promise<LinkedInPostResult> {
     validatePlatformInput("linkedin", "createImagePost", input);
     const author = authorOrThrow(input.author);
     return linkedInRequest({
@@ -91,12 +111,20 @@ export class LinkedIn {
     });
   }
 
-  static async createVideoPost(input: { author?: string; text: string; mediaUrn: string }) {
+  static async createVideoPost(input: {
+    author?: string;
+    text: string;
+    mediaUrn: string;
+  }): Promise<LinkedInPostResult> {
     validatePlatformInput("linkedin", "createVideoPost", input);
     return LinkedIn.createImagePost(input);
   }
 
-  static async createCarouselPost(input: { author?: string; text: string; mediaUrns: string[] }) {
+  static async createCarouselPost(input: {
+    author?: string;
+    text: string;
+    mediaUrns: string[];
+  }): Promise<LinkedInPostResult> {
     validatePlatformInput("linkedin", "createCarouselPost", input);
     const author = authorOrThrow(input.author);
     return linkedInRequest({
@@ -116,7 +144,11 @@ export class LinkedIn {
     });
   }
 
-  static async schedulePost(input: { author?: string; text: string; publishAt: Date | string }) {
+  static async schedulePost(input: {
+    author?: string;
+    text: string;
+    publishAt: Date | string;
+  }): Promise<LinkedInPostResult> {
     validatePlatformInput("linkedin", "schedulePost", input);
     return scheduleTask({
       id: `linkedin-schedule-${Date.now()}`,
@@ -125,7 +157,11 @@ export class LinkedIn {
     });
   }
 
-  static async commentOnPost(input: { actor?: string; objectUrn: string; message: string }) {
+  static async commentOnPost(input: {
+    actor?: string;
+    objectUrn: string;
+    message: string;
+  }): Promise<LinkedInPostResult> {
     validatePlatformInput("linkedin", "commentOnPost", input);
     const actor = authorOrThrow(input.actor);
     return linkedInRequest({
@@ -139,7 +175,11 @@ export class LinkedIn {
     });
   }
 
-  static async replyToComment(input: { actor?: string; parentCommentUrn: string; message: string }) {
+  static async replyToComment(input: {
+    actor?: string;
+    parentCommentUrn: string;
+    message: string;
+  }): Promise<LinkedInPostResult> {
     validatePlatformInput("linkedin", "replyToComment", input);
     const actor = authorOrThrow(input.actor);
     return linkedInRequest({
@@ -153,38 +193,61 @@ export class LinkedIn {
     });
   }
 
-  static async deleteComment(input: { encodedCommentUrn: string }) {
+  static async deleteComment(input: {
+    encodedCommentUrn: string;
+  }): Promise<LinkedInDeleteResult> {
     validatePlatformInput("linkedin", "deleteComment", input);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: `/socialActions/comments/${encodeURIComponent(input.encodedCommentUrn)}`,
       method: "DELETE"
     });
+    return normalizeDeleteResult({
+      platform: "linkedin",
+      targetId: input.encodedCommentUrn,
+      raw
+    });
   }
 
-  static async likePost(input: { actor?: string; objectUrn: string }) {
+  static async likePost(input: {
+    actor?: string;
+    objectUrn: string;
+  }): Promise<LinkedInActionResult> {
     validatePlatformInput("linkedin", "likePost", input);
     const actor = authorOrThrow(input.actor);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: "/socialActions/likes",
       method: "POST",
       data: { actor, object: input.objectUrn }
     });
+    return normalizeActionResult({ platform: "linkedin", action: "likePost", raw });
   }
 
-  static async unlikePost(input: { actorUrn?: string; encodedObjectUrn: string }) {
+  static async unlikePost(input: {
+    actorUrn?: string;
+    encodedObjectUrn: string;
+  }): Promise<LinkedInDeleteResult> {
     validatePlatformInput("linkedin", "unlikePost", input);
     const actorUrn = authorOrThrow(input.actorUrn);
     const encodedActor = encodeURIComponent(actorUrn);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: `/socialActions/${encodeURIComponent(input.encodedObjectUrn)}/likes/${encodedActor}`,
       method: "DELETE"
     });
+    return normalizeDeleteResult({
+      platform: "linkedin",
+      targetId: input.encodedObjectUrn,
+      raw
+    });
   }
 
-  static async sendDirectMessage(input: { actor?: string; recipientUrn: string; text: string }) {
+  static async sendDirectMessage(input: {
+    actor?: string;
+    recipientUrn: string;
+    text: string;
+  }): Promise<LinkedInActionResult> {
     validatePlatformInput("linkedin", "sendDirectMessage", input);
     const actor = authorOrThrow(input.actor);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: "/messages",
       method: "POST",
       data: {
@@ -193,9 +256,12 @@ export class LinkedIn {
         body: input.text
       }
     });
+    return normalizeActionResult({ platform: "linkedin", action: "sendDirectMessage", raw });
   }
 
-  static async getPostAnalytics(input: { postUrn: string }) {
+  static async getPostAnalytics(
+    input: { postUrn: string }
+  ): Promise<LinkedInAnalyticsResult> {
     validatePlatformInput("linkedin", "getPostAnalytics", input);
     return linkedInRequest({
       endpoint: "/organizationalEntityShareStatistics",
@@ -207,7 +273,9 @@ export class LinkedIn {
     });
   }
 
-  static async getOrganizationAnalytics(input: { orgUrn?: string }) {
+  static async getOrganizationAnalytics(
+    input: { orgUrn?: string }
+  ): Promise<LinkedInAnalyticsResult> {
     validatePlatformInput("linkedin", "getOrganizationAnalytics", input);
     const orgUrn = input.orgUrn ?? env.linkedin.orgUrn;
     if (!orgUrn) {
@@ -228,15 +296,10 @@ export class LinkedIn {
     owner?: string;
     mediaType: "image" | "video";
     fileSize: number;
-  }) {
+  }): Promise<LinkedInUploadRegistrationResult> {
     validatePlatformInput("linkedin", "registerUpload", input);
     const owner = authorOrThrow(input.owner);
-    return linkedInRequest<{
-      value: {
-        uploadMechanism: Record<string, unknown>;
-        asset: string;
-      };
-    }>({
+    return linkedInRequest<LinkedInUploadRegistrationResult>({
       endpoint: "/assets?action=registerUpload",
       method: "POST",
       data: {
@@ -258,11 +321,14 @@ export class LinkedIn {
     });
   }
 
-  static async uploadBinary(input: { uploadUrl: string; mediaPath: string }) {
+  static async uploadBinary(input: {
+    uploadUrl: string;
+    mediaPath: string;
+  }): Promise<LinkedInBinaryUploadResult> {
     validatePlatformInput("linkedin", "uploadBinary", input);
     const { fileSize } = getFileMeta(input.mediaPath);
     await getLinkedInAccessToken();
-    return withRetries({
+    await withRetries({
       platform: "linkedin",
       endpoint: "uploadBinary",
       execute: async () =>
@@ -274,13 +340,21 @@ export class LinkedIn {
           }
         })
     });
+    return { bytesUploaded: fileSize };
   }
 
-  static async deletePost(input: { encodedPostUrn: string }) {
+  static async deletePost(input: {
+    encodedPostUrn: string;
+  }): Promise<LinkedInDeleteResult> {
     validatePlatformInput("linkedin", "deletePost", input);
-    return linkedInRequest({
+    const raw = await linkedInRequest({
       endpoint: `/posts/${encodeURIComponent(input.encodedPostUrn)}`,
       method: "DELETE"
+    });
+    return normalizeDeleteResult({
+      platform: "linkedin",
+      targetId: input.encodedPostUrn,
+      raw
     });
   }
 }

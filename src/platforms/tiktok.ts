@@ -1,9 +1,20 @@
 import axios from "axios";
 import { env } from "../config/env.js";
 import { SocialError } from "../errors/SocialError.js";
+import {
+  normalizeActionResult,
+  normalizeDeleteResult
+} from "../utils/normalizedResult.js";
 import { withRetries } from "../utils/retry.js";
 import { scheduleTask } from "../utils/scheduler.js";
 import { validatePlatformInput } from "../validation/platformSchemas.js";
+import type {
+  TikTokActionResult,
+  TikTokAnalyticsResult,
+  TikTokDeleteVideoResult,
+  TikTokListVideosResult,
+  TikTokPostResult
+} from "../responseTypes.js";
 
 const TIKTOK_API_BASE = "https://open.tiktokapis.com/v2";
 
@@ -56,7 +67,7 @@ export class TikTok {
   static async createPost(input: {
     text: string;
     visibility?: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "SELF_ONLY";
-  }) {
+  }): Promise<TikTokPostResult> {
     validatePlatformInput("tiktok", "createPost", input);
     return tikTokRequest({
       endpoint: "/post/publish/inbox/video/init/",
@@ -78,7 +89,7 @@ export class TikTok {
     title: string;
     videoUrl: string;
     visibility?: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "SELF_ONLY";
-  }) {
+  }): Promise<TikTokPostResult> {
     validatePlatformInput("tiktok", "createVideoPost", input);
     return tikTokRequest({
       endpoint: "/post/publish/video/init/",
@@ -96,7 +107,9 @@ export class TikTok {
     });
   }
 
-  static async getPostStatus(input: { publishId: string }) {
+  static async getPostStatus(
+    input: { publishId: string }
+  ): Promise<TikTokPostResult> {
     validatePlatformInput("tiktok", "getPostStatus", input);
     return tikTokRequest({
       endpoint: "/post/publish/status/fetch/",
@@ -105,7 +118,9 @@ export class TikTok {
     });
   }
 
-  static async listVideos(input: { maxCount?: number }) {
+  static async listVideos(
+    input: { maxCount?: number }
+  ): Promise<TikTokListVideosResult> {
     validatePlatformInput("tiktok", "listVideos", input);
     return tikTokRequest({
       endpoint: "/video/list/",
@@ -114,52 +129,71 @@ export class TikTok {
     });
   }
 
-  static async deleteVideo(input: { videoId: string }) {
+  static async deleteVideo(
+    input: { videoId: string }
+  ): Promise<TikTokDeleteVideoResult> {
     validatePlatformInput("tiktok", "deleteVideo", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/delete/",
       method: "POST",
       data: { video_id: input.videoId }
     });
+    return normalizeDeleteResult({ platform: "tiktok", targetId: input.videoId, raw });
   }
 
-  static async commentOnVideo(input: { videoId: string; text: string }) {
+  static async commentOnVideo(input: {
+    videoId: string;
+    text: string;
+  }): Promise<TikTokActionResult> {
     validatePlatformInput("tiktok", "commentOnVideo", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/comment/create/",
       method: "POST",
       data: { video_id: input.videoId, text: input.text }
     });
+    return normalizeActionResult({ platform: "tiktok", action: "commentOnVideo", raw });
   }
 
-  static async replyToComment(input: { commentId: string; text: string }) {
+  static async replyToComment(input: {
+    commentId: string;
+    text: string;
+  }): Promise<TikTokActionResult> {
     validatePlatformInput("tiktok", "replyToComment", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/comment/reply/",
       method: "POST",
       data: { comment_id: input.commentId, text: input.text }
     });
+    return normalizeActionResult({ platform: "tiktok", action: "replyToComment", raw });
   }
 
-  static async likeVideo(input: { videoId: string }) {
+  static async likeVideo(input: {
+    videoId: string;
+  }): Promise<TikTokActionResult> {
     validatePlatformInput("tiktok", "likeVideo", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/like/",
       method: "POST",
       data: { video_id: input.videoId }
     });
+    return normalizeActionResult({ platform: "tiktok", action: "likeVideo", raw });
   }
 
-  static async unlikeVideo(input: { videoId: string }) {
+  static async unlikeVideo(input: {
+    videoId: string;
+  }): Promise<TikTokActionResult> {
     validatePlatformInput("tiktok", "unlikeVideo", input);
-    return tikTokRequest({
+    const raw = await tikTokRequest({
       endpoint: "/video/unlike/",
       method: "POST",
       data: { video_id: input.videoId }
     });
+    return normalizeActionResult({ platform: "tiktok", action: "unlikeVideo", raw });
   }
 
-  static async getVideoAnalytics(input: { videoIds: string[] }) {
+  static async getVideoAnalytics(
+    input: { videoIds: string[] }
+  ): Promise<TikTokAnalyticsResult> {
     validatePlatformInput("tiktok", "getVideoAnalytics", input);
     return tikTokRequest({
       endpoint: "/research/video/query/",
@@ -168,7 +202,9 @@ export class TikTok {
     });
   }
 
-  static async getProfileAnalytics(input: { fields?: string[] }) {
+  static async getProfileAnalytics(
+    input: { fields?: string[] }
+  ): Promise<TikTokAnalyticsResult> {
     validatePlatformInput("tiktok", "getProfileAnalytics", input);
     return tikTokRequest({
       endpoint: "/user/info/",
@@ -183,7 +219,7 @@ export class TikTok {
     title: string;
     videoUrl: string;
     publishAt: Date | string;
-  }) {
+  }): Promise<TikTokPostResult> {
     validatePlatformInput("tiktok", "scheduleVideoPost", input);
     return scheduleTask({
       id: `tiktok-schedule-${Date.now()}`,

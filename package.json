@@ -1,6 +1,6 @@
 {
   "name": "universal-social-sdk",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "TypeScript-first universal social media SDK for Node.js",
   "type": "module",
   "license": "MIT",
@@ -63,6 +63,7 @@
     "example:x": "node examples/x-post.mjs",
     "example:instagram": "node examples/instagram-reel.mjs",
     "example:bluesky": "node examples/bluesky-post.mjs",
+    "example:queue": "node examples/queue-in-memory.mjs",
     "test:watch": "vitest",
     "prepare": "npm run build"
   },

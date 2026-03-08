@@ -1,40 +1,21 @@
-const scheduledJobs = new Map<string, NodeJS.Timeout>();
-
-function toDate(value: Date | string): Date {
-  if (value instanceof Date) {
-    return value;
-  }
-  return new Date(value);
-}
+import { getQueueAdapter } from "../queue/index.js";
 
 export function scheduleTask<T>(params: {
   id: string;
   runAt: Date | string;
   task: () => Promise<T>;
 }): Promise<T> {
-  const runAt = toDate(params.runAt).getTime();
-  const delay = Math.max(0, runAt - Date.now());
-
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(async () => {
-      scheduledJobs.delete(params.id);
-      try {
-        resolve(await params.task());
-      } catch (error) {
-        reject(error);
-      }
-    }, delay);
-
-    scheduledJobs.set(params.id, timeout);
-  });
+  return getQueueAdapter()
+    .schedule(
+      {
+        id: params.id,
+        task: params.task
+      },
+      params.runAt
+    )
+    .then((handle) => handle.result);
 }
 
 export function cancelScheduledTask(id: string): boolean {
-  const timeout = scheduledJobs.get(id);
-  if (!timeout) {
-    return false;
-  }
-  clearTimeout(timeout);
-  scheduledJobs.delete(id);
-  return true;
+  return getQueueAdapter().cancel(id);
 }

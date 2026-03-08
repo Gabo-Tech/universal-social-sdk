@@ -9,7 +9,9 @@ TypeScript-first, ESM-only, zero-bloat Node.js SDK that provides one unified int
 
 - [Project Structure](./docs/PROJECT_STRUCTURE.md)
 - [NPM Package Guide](./docs/NPM_PACKAGE_GUIDE.md)
+- [Response Contracts](./docs/RESPONSE_CONTRACTS.md)
 - [Contributing](./docs/CONTRIBUTING.md)
+- [Roadmap v1.1.0](./docs/ROADMAP_v1.1.0.md)
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
 - [Security Policy](./SECURITY.md)
 - [Changelog](./CHANGELOG.md)
@@ -55,6 +57,7 @@ Run bundled examples:
 npm run example:x
 npm run example:instagram
 npm run example:bluesky
+npm run example:queue
 ```
 
 Files:
@@ -62,6 +65,60 @@ Files:
 - `examples/x-post.mjs`
 - `examples/instagram-reel.mjs`
 - `examples/bluesky-post.mjs`
+- `examples/queue-in-memory.mjs`
+
+## Queue Adapters
+
+The scheduler uses a queue adapter. By default it uses an in-memory adapter.
+
+```ts
+import { InMemoryQueueAdapter, setQueueAdapter } from "universal-social-sdk";
+
+setQueueAdapter(new InMemoryQueueAdapter());
+```
+
+Adapter exports:
+
+- `InMemoryQueueAdapter` (default behavior)
+- `BullMQAdapter` (skeleton)
+- `SQSAdapter` (skeleton)
+
+The scheduler APIs (for example `X.scheduleTweet`) will use the active adapter automatically.
+
+## Typed Responses
+
+All public SDK methods now return concrete TypeScript interfaces, including platform-specific action/delete aliases for clearer contracts.
+Action/delete/mutation/detail responses are normalized into stable contracts (`success`, `action`/`targetId`/`resourceId`, `raw`) so provider endpoint changes are isolated to SDK internals.
+
+```ts
+import { X } from "universal-social-sdk";
+import type { XPostResult } from "universal-social-sdk";
+
+const result: XPostResult = await X.postTweet({ text: "typed response" });
+console.log(result.data.id);
+```
+
+## Webhooks
+
+The SDK includes webhook utilities for Meta-style and X-style signatures, normalized event parsing, and a lightweight router.
+
+```ts
+import {
+  WebhookRouter,
+  verifyMetaWebhookSignature,
+  verifyXWebhookSignature
+} from "universal-social-sdk";
+
+const router = new WebhookRouter();
+
+router.on("meta.feed", async (event) => {
+  console.log("Meta feed event", event.payload);
+});
+
+router.on("x.tweet_create_events", async (event) => {
+  console.log("X tweet event", event.payload);
+});
+```
 
 ## Required Environment Variables
 
@@ -162,6 +219,7 @@ npx universal-social-sdk update
 npx universal-social-sdk update --dry-run
 npx universal-social-sdk update --model llama3.2
 npx universal-social-sdk update --yes
+npx universal-social-sdk update --ci --open-pr --base main --branch-prefix chore/updater
 ```
 
 Flow:
@@ -172,6 +230,13 @@ Flow:
 4. Requests generated method updates + full TypeScript file content.
 5. Shows git-style diffs and asks for confirmation.
 6. Applies patches and rebuilds package.
+
+CI/PR mode writes deterministic artifacts in `.artifacts/`:
+
+- `update-plan.json`
+- `update-diff-summary.json`
+- `pr-title.txt`
+- `pr-body.md`
 
 ## Supported Methods
 
@@ -313,6 +378,12 @@ This repo includes:
 
 - `.github/workflows/ci.yml` for build + unit tests on every push/PR.
 - `.github/workflows/release.yml` for npm publish on tag (`v*`) or manual dispatch.
+- `.github/workflows/auto-update-pr.yml` for scheduled doc crawling + updater PR generation.
+  - Generates `.artifacts/*` for PR metadata during the run but does not commit artifact files.
+
+Manual dry-run option for updater workflow:
+
+- In **Actions -> Auto Update PR -> Run workflow**, set `dry_run=true` to run detection and artifact generation only (no branch/PR).
 
 Configure these repository secrets to enable integration CI:
 
@@ -344,3 +415,8 @@ Configure these repository secrets to enable integration CI:
 Configure this repository secret for publishing:
 
 - `NPM_TOKEN`
+
+Configure this repository secret for scheduled updater PRs:
+
+- `OLLAMA_HOST` (required; endpoint reachable from GitHub Actions runner)
+- `OLLAMA_MODEL` (optional override)

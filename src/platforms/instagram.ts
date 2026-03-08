@@ -1,8 +1,20 @@
 import { env } from "../config/env.js";
 import { SocialError } from "../errors/SocialError.js";
 import { metaCall } from "./shared/metaClient.js";
+import {
+  normalizeActionResult,
+  normalizeDeleteResult,
+  normalizeDetailResult
+} from "../utils/normalizedResult.js";
 import { scheduleTask } from "../utils/scheduler.js";
 import { validatePlatformInput } from "../validation/platformSchemas.js";
+import type {
+  InstagramDeleteResult,
+  InstagramModerationResult,
+  InstagramPublishingLimitResult,
+  MetaInsightsResult,
+  MetaPublishResult
+} from "../responseTypes.js";
 
 function igUserIdOrThrow(inputUserId?: string): string {
   const igUserId = inputUserId ?? env.meta.igUserId;
@@ -40,8 +52,11 @@ async function createMediaContainer(params: {
   });
 }
 
-async function publishContainer(igUserId: string, creationId: string) {
-  return metaCall({
+async function publishContainer(
+  igUserId: string,
+  creationId: string
+): Promise<MetaPublishResult> {
+  return metaCall<MetaPublishResult>({
     platform: "instagram",
     method: "POST",
     endpoint: `/${igUserId}/media_publish`,
@@ -50,7 +65,11 @@ async function publishContainer(igUserId: string, creationId: string) {
 }
 
 export class Instagram {
-  static async uploadPhoto(input: { igUserId?: string; imageUrl: string; caption?: string }) {
+  static async uploadPhoto(input: {
+    igUserId?: string;
+    imageUrl: string;
+    caption?: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "uploadPhoto", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
     const container = await createMediaContainer({
@@ -62,7 +81,11 @@ export class Instagram {
     return publishContainer(igUserId, container.id);
   }
 
-  static async uploadVideo(input: { igUserId?: string; videoUrl: string; caption?: string }) {
+  static async uploadVideo(input: {
+    igUserId?: string;
+    videoUrl: string;
+    caption?: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "uploadVideo", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
     const container = await createMediaContainer({
@@ -74,7 +97,12 @@ export class Instagram {
     return publishContainer(igUserId, container.id);
   }
 
-  static async uploadReel(input: { igUserId?: string; mediaPath?: string; videoUrl: string; caption?: string }) {
+  static async uploadReel(input: {
+    igUserId?: string;
+    mediaPath?: string;
+    videoUrl: string;
+    caption?: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "uploadReel", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
     const container = await createMediaContainer({
@@ -86,7 +114,10 @@ export class Instagram {
     return publishContainer(igUserId, container.id);
   }
 
-  static async uploadStoryPhoto(input: { igUserId?: string; imageUrl: string }) {
+  static async uploadStoryPhoto(input: {
+    igUserId?: string;
+    imageUrl: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "uploadStoryPhoto", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
     const container = await createMediaContainer({
@@ -97,7 +128,10 @@ export class Instagram {
     return publishContainer(igUserId, container.id);
   }
 
-  static async uploadStoryVideo(input: { igUserId?: string; videoUrl: string }) {
+  static async uploadStoryVideo(input: {
+    igUserId?: string;
+    videoUrl: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "uploadStoryVideo", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
     const container = await createMediaContainer({
@@ -112,7 +146,7 @@ export class Instagram {
     igUserId?: string;
     caption?: string;
     items: Array<{ imageUrl?: string; videoUrl?: string }>;
-  }) {
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "publishCarousel", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
     const children: string[] = [];
@@ -134,7 +168,10 @@ export class Instagram {
     return publishContainer(igUserId, parent.id);
   }
 
-  static async commentOnMedia(input: { mediaId: string; message: string }) {
+  static async commentOnMedia(input: {
+    mediaId: string;
+    message: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "commentOnMedia", input);
     return metaCall({
       platform: "instagram",
@@ -144,7 +181,10 @@ export class Instagram {
     });
   }
 
-  static async replyToComment(input: { commentId: string; message: string }) {
+  static async replyToComment(input: {
+    commentId: string;
+    message: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "replyToComment", input);
     return metaCall({
       platform: "instagram",
@@ -154,35 +194,48 @@ export class Instagram {
     });
   }
 
-  static async hideComment(input: { commentId: string; hide: boolean }) {
+  static async hideComment(input: {
+    commentId: string;
+    hide: boolean;
+  }): Promise<InstagramModerationResult> {
     validatePlatformInput("instagram", "hideComment", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "instagram",
       method: "POST",
       endpoint: `/${input.commentId}`,
       body: { hidden: input.hide }
     });
+    return normalizeActionResult({ platform: "instagram", action: "hideComment", raw });
   }
 
-  static async deleteComment(input: { commentId: string }) {
+  static async deleteComment(input: {
+    commentId: string;
+  }): Promise<InstagramDeleteResult> {
     validatePlatformInput("instagram", "deleteComment", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "instagram",
       method: "DELETE",
       endpoint: `/${input.commentId}`
     });
+    return normalizeDeleteResult({ platform: "instagram", targetId: input.commentId, raw });
   }
 
-  static async deleteMedia(input: { mediaId: string }) {
+  static async deleteMedia(input: {
+    mediaId: string;
+  }): Promise<InstagramDeleteResult> {
     validatePlatformInput("instagram", "deleteMedia", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "instagram",
       method: "DELETE",
       endpoint: `/${input.mediaId}`
     });
+    return normalizeDeleteResult({ platform: "instagram", targetId: input.mediaId, raw });
   }
 
-  static async sendPrivateReply(input: { commentId: string; message: string }) {
+  static async sendPrivateReply(input: {
+    commentId: string;
+    message: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "sendPrivateReply", input);
     return metaCall({
       platform: "instagram",
@@ -192,7 +245,10 @@ export class Instagram {
     });
   }
 
-  static async getMediaInsights(input: { mediaId: string; metrics?: string[] }) {
+  static async getMediaInsights(input: {
+    mediaId: string;
+    metrics?: string[];
+  }): Promise<MetaInsightsResult> {
     validatePlatformInput("instagram", "getMediaInsights", input);
     return metaCall({
       platform: "instagram",
@@ -202,7 +258,11 @@ export class Instagram {
     });
   }
 
-  static async getAccountInsights(input: { igUserId?: string; metrics?: string[]; period?: "day" | "week" | "days_28" }) {
+  static async getAccountInsights(input: {
+    igUserId?: string;
+    metrics?: string[];
+    period?: "day" | "week" | "days_28";
+  }): Promise<MetaInsightsResult> {
     validatePlatformInput("instagram", "getAccountInsights", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
     return metaCall({
@@ -216,18 +276,26 @@ export class Instagram {
     });
   }
 
-  static async getPublishingLimit(input: { igUserId?: string }) {
+  static async getPublishingLimit(input: {
+    igUserId?: string;
+  }): Promise<InstagramPublishingLimitResult> {
     validatePlatformInput("instagram", "getPublishingLimit", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
-    return metaCall({
+    const raw = await metaCall({
       platform: "instagram",
       method: "GET",
       endpoint: `/${igUserId}/content_publishing_limit`,
       query: { fields: "quota_usage,config" }
     });
+    return normalizeDetailResult({ platform: "instagram", raw });
   }
 
-  static async scheduleReel(input: { igUserId?: string; videoUrl: string; caption?: string; publishAt: Date | string }) {
+  static async scheduleReel(input: {
+    igUserId?: string;
+    videoUrl: string;
+    caption?: string;
+    publishAt: Date | string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("instagram", "scheduleReel", input);
     const igUserId = igUserIdOrThrow(input.igUserId);
     return scheduleTask({

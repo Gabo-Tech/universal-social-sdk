@@ -1,30 +1,363 @@
-import * as axios from 'axios';
+interface XPostResult {
+    data: {
+        id: string;
+        text?: string;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
+interface XTweetAnalyticsResult {
+    data?: {
+        id?: string;
+        public_metrics?: Record<string, number>;
+        organic_metrics?: Record<string, number>;
+        non_public_metrics?: Record<string, number>;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
+interface GenericPlatformResult {
+    [key: string]: unknown;
+}
+interface GenericActionResult {
+    data?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+interface GenericDeleteResult {
+    deleted?: boolean;
+    success?: boolean;
+    [key: string]: unknown;
+}
+interface XActionResult {
+    platform: "x";
+    action: string;
+    success: boolean;
+    raw?: unknown;
+}
+interface XDeleteTweetResult {
+    platform: "x";
+    targetId: string;
+    deleted: boolean;
+    success: boolean;
+    raw?: unknown;
+}
+interface MetaPublishResult {
+    id?: string;
+    post_id?: string;
+    [key: string]: unknown;
+}
+interface MetaListResult<T = Record<string, unknown>> {
+    data?: T[];
+    paging?: {
+        cursors?: Record<string, string>;
+        next?: string;
+        previous?: string;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
+interface MetaInsightsResult {
+    data?: Array<{
+        name?: string;
+        period?: string;
+        values?: unknown[];
+        title?: string;
+        description?: string;
+        id?: string;
+        [key: string]: unknown;
+    }>;
+    [key: string]: unknown;
+}
+interface FacebookActionResult {
+    platform: "facebook";
+    action: string;
+    success: boolean;
+    raw?: unknown;
+}
+interface FacebookDeleteResult {
+    platform: "facebook";
+    targetId: string;
+    deleted: boolean;
+    success: boolean;
+    raw?: unknown;
+}
+interface FacebookResumableVideoResult {
+    platform: "facebook";
+    success: boolean;
+    resourceId?: string;
+    raw?: unknown;
+}
+interface InstagramModerationResult {
+    platform: "instagram";
+    action: string;
+    success: boolean;
+    raw?: unknown;
+}
+interface InstagramDeleteResult {
+    platform: "instagram";
+    targetId: string;
+    deleted: boolean;
+    success: boolean;
+    raw?: unknown;
+}
+interface InstagramPublishingLimitResult {
+    platform: "instagram";
+    success: boolean;
+    raw?: unknown;
+}
+interface LinkedInPostResult {
+    id?: string;
+    urn?: string;
+    [key: string]: unknown;
+}
+interface LinkedInAnalyticsResult {
+    elements?: Array<Record<string, unknown>>;
+    paging?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+interface LinkedInUploadRegistrationResult {
+    value?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+interface LinkedInBinaryUploadResult {
+    bytesUploaded: number;
+}
+interface LinkedInActionResult {
+    platform: "linkedin";
+    action: string;
+    success: boolean;
+    raw?: unknown;
+}
+interface LinkedInDeleteResult {
+    platform: "linkedin";
+    targetId: string;
+    deleted: boolean;
+    success: boolean;
+    raw?: unknown;
+}
+interface YouTubeListVideosResult {
+    items?: Array<Record<string, unknown>>;
+    nextPageToken?: string;
+    prevPageToken?: string;
+    pageInfo?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+interface YouTubeAnalyticsResult {
+    rows?: unknown[][];
+    columnHeaders?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+}
+interface YouTubeUploadBinaryResult {
+    bytesUploaded: number;
+}
+interface YouTubeVideoMetadataResult {
+    platform: "youtube";
+    success: boolean;
+    resourceId?: string;
+    raw?: unknown;
+}
+interface YouTubeDeleteVideoResult {
+    platform: "youtube";
+    targetId: string;
+    deleted: boolean;
+    success: boolean;
+    raw?: unknown;
+}
+interface YouTubeCommentResult {
+    platform: "youtube";
+    success: boolean;
+    resourceId?: string;
+    raw?: unknown;
+}
+interface YouTubeRatingResult {
+    platform: "youtube";
+    action: string;
+    success: boolean;
+    raw?: unknown;
+}
+interface TikTokListVideosResult {
+    data?: {
+        videos?: Array<Record<string, unknown>>;
+        cursor?: number | string;
+        has_more?: boolean;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
+interface TikTokAnalyticsResult {
+    data?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+interface TikTokPostResult {
+    data?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+interface TikTokDeleteVideoResult {
+    platform: "tiktok";
+    targetId: string;
+    deleted: boolean;
+    success: boolean;
+    raw?: unknown;
+}
+interface TikTokActionResult {
+    platform: "tiktok";
+    action: string;
+    success: boolean;
+    raw?: unknown;
+}
+interface PinterestListBoardsResult {
+    items?: Array<Record<string, unknown>>;
+    bookmark?: string;
+    [key: string]: unknown;
+}
+interface PinterestAnalyticsResult {
+    all?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+interface PinterestListPinsResult {
+    items?: Array<Record<string, unknown>>;
+    bookmark?: string;
+    [key: string]: unknown;
+}
+interface PinterestMutationResult {
+    platform: "pinterest";
+    success: boolean;
+    resourceId?: string;
+    raw?: unknown;
+}
+interface PinterestDeleteResult {
+    platform: "pinterest";
+    targetId: string;
+    deleted: boolean;
+    success: boolean;
+    raw?: unknown;
+}
+interface PinterestActionResult {
+    platform: "pinterest";
+    action: string;
+    success: boolean;
+    raw?: unknown;
+}
+interface BlueskyRecordResult {
+    uri?: string;
+    cid?: string;
+    [key: string]: unknown;
+}
+interface BlueskyFeedResult {
+    feed?: Array<Record<string, unknown>>;
+    cursor?: string;
+    [key: string]: unknown;
+}
+interface BlueskySearchResult {
+    posts?: Array<Record<string, unknown>>;
+    cursor?: string;
+    [key: string]: unknown;
+}
+interface BlueskyThreadResult {
+    thread?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+interface BlueskyNotificationsResult {
+    notifications?: Array<Record<string, unknown>>;
+    cursor?: string;
+    [key: string]: unknown;
+}
+interface BlueskyDeleteResult {
+    platform: "bluesky";
+    action: string;
+    success: boolean;
+    raw?: unknown;
+}
+interface MastodonStatusResult {
+    id?: string;
+    uri?: string;
+    content?: string;
+    created_at?: string;
+    [key: string]: unknown;
+}
+type MastodonListStatusesResult = MastodonStatusResult[];
+interface MastodonMediaResult {
+    id?: string;
+    type?: string;
+    url?: string;
+    [key: string]: unknown;
+}
+interface MastodonContextResult {
+    ancestors?: Array<Record<string, unknown>>;
+    descendants?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+}
+interface MastodonDeleteStatusResult {
+    platform: "mastodon";
+    targetId: string;
+    deleted: boolean;
+    success: boolean;
+    raw?: unknown;
+}
+interface MastodonAccountAnalyticsResult {
+    platform: "mastodon";
+    success: boolean;
+    raw?: unknown;
+}
+interface ThreadsPublishResult {
+    id?: string;
+    [key: string]: unknown;
+}
+interface ThreadsListResult {
+    data?: Array<Record<string, unknown>>;
+    paging?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+interface ThreadsInsightsResult {
+    data?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+}
+interface ThreadsDeleteResult {
+    platform: "threads";
+    targetId: string;
+    deleted: boolean;
+    success: boolean;
+    raw?: unknown;
+}
+interface ThreadsActionResult {
+    platform: "threads";
+    action: string;
+    success: boolean;
+    raw?: unknown;
+}
+interface ThreadsThreadResult {
+    platform: "threads";
+    success: boolean;
+    raw?: unknown;
+}
+type XThreadResult = XPostResult[];
+type XUploadMediaResult = string;
 
 declare class Instagram {
     static uploadPhoto(input: {
         igUserId?: string;
         imageUrl: string;
         caption?: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static uploadVideo(input: {
         igUserId?: string;
         videoUrl: string;
         caption?: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static uploadReel(input: {
         igUserId?: string;
         mediaPath?: string;
         videoUrl: string;
         caption?: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static uploadStoryPhoto(input: {
         igUserId?: string;
         imageUrl: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static uploadStoryVideo(input: {
         igUserId?: string;
         videoUrl: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static publishCarousel(input: {
         igUserId?: string;
         caption?: string;
@@ -32,47 +365,47 @@ declare class Instagram {
             imageUrl?: string;
             videoUrl?: string;
         }>;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static commentOnMedia(input: {
         mediaId: string;
         message: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static replyToComment(input: {
         commentId: string;
         message: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static hideComment(input: {
         commentId: string;
         hide: boolean;
-    }): Promise<unknown>;
+    }): Promise<InstagramModerationResult>;
     static deleteComment(input: {
         commentId: string;
-    }): Promise<unknown>;
+    }): Promise<InstagramDeleteResult>;
     static deleteMedia(input: {
         mediaId: string;
-    }): Promise<unknown>;
+    }): Promise<InstagramDeleteResult>;
     static sendPrivateReply(input: {
         commentId: string;
         message: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static getMediaInsights(input: {
         mediaId: string;
         metrics?: string[];
-    }): Promise<unknown>;
+    }): Promise<MetaInsightsResult>;
     static getAccountInsights(input: {
         igUserId?: string;
         metrics?: string[];
         period?: "day" | "week" | "days_28";
-    }): Promise<unknown>;
+    }): Promise<MetaInsightsResult>;
     static getPublishingLimit(input: {
         igUserId?: string;
-    }): Promise<unknown>;
+    }): Promise<InstagramPublishingLimitResult>;
     static scheduleReel(input: {
         igUserId?: string;
         videoUrl: string;
         caption?: string;
         publishAt: Date | string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
 }
 
 interface PostTweetInput {
@@ -97,48 +430,48 @@ interface PollTweetInput {
     durationMinutes: number;
 }
 declare class X {
-    static postTweet(input: PostTweetInput): Promise<any>;
+    static postTweet(input: PostTweetInput): Promise<XPostResult>;
     static postThread(input: {
         tweets: string[];
-    }): Promise<unknown[]>;
-    static replyTweet(input: ReplyTweetInput): Promise<any>;
-    static quoteTweet(input: QuoteTweetInput): Promise<any>;
+    }): Promise<XThreadResult>;
+    static replyTweet(input: ReplyTweetInput): Promise<XPostResult>;
+    static quoteTweet(input: QuoteTweetInput): Promise<XPostResult>;
     static deleteTweet(input: {
         tweetId: string;
-    }): Promise<any>;
+    }): Promise<XDeleteTweetResult>;
     static retweet(input: {
         userId: string;
         tweetId: string;
-    }): Promise<any>;
+    }): Promise<XActionResult>;
     static unretweet(input: {
         userId: string;
         tweetId: string;
-    }): Promise<any>;
+    }): Promise<XActionResult>;
     static likeTweet(input: {
         userId: string;
         tweetId: string;
-    }): Promise<any>;
+    }): Promise<XActionResult>;
     static unlikeTweet(input: {
         userId: string;
         tweetId: string;
-    }): Promise<any>;
+    }): Promise<XActionResult>;
     static uploadMedia(input: {
         mediaPath: string;
-    }): Promise<string>;
-    static postPhoto(input: PostMediaInput): Promise<any>;
-    static postVideo(input: PostMediaInput): Promise<any>;
-    static postPoll(input: PollTweetInput): Promise<any>;
+    }): Promise<XUploadMediaResult>;
+    static postPhoto(input: PostMediaInput): Promise<XPostResult>;
+    static postVideo(input: PostMediaInput): Promise<XPostResult>;
+    static postPoll(input: PollTweetInput): Promise<XPostResult>;
     static sendDirectMessage(input: {
         recipientId: string;
         text: string;
-    }): Promise<any>;
+    }): Promise<XActionResult>;
     static getTweetAnalytics(input: {
         tweetId: string;
-    }): Promise<any>;
+    }): Promise<XTweetAnalyticsResult>;
     static scheduleTweet(input: {
         text: string;
         publishAt: Date | string;
-    }): Promise<any>;
+    }): Promise<XPostResult>;
 }
 
 declare class Facebook {
@@ -147,73 +480,73 @@ declare class Facebook {
         message: string;
         link?: string;
         photoUrl?: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static publishPhoto(input: {
         pageId?: string;
         url: string;
         caption?: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static publishVideo(input: {
         pageId?: string;
         fileUrl: string;
         description?: string;
         title?: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static publishCarousel(input: {
         pageId?: string;
         message: string;
         photoUrls: string[];
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static publishStory(input: {
         pageId?: string;
         photoUrl: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static schedulePost(input: {
         pageId?: string;
         message: string;
         publishAt: Date | string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static commentOnPost(input: {
         postId: string;
         message: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static replyToComment(input: {
         commentId: string;
         message: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static likeObject(input: {
         objectId: string;
-    }): Promise<unknown>;
+    }): Promise<FacebookActionResult>;
     static deletePost(input: {
         objectId: string;
-    }): Promise<unknown>;
+    }): Promise<FacebookDeleteResult>;
     static sendPageMessage(input: {
         recipientPsid: string;
         message: string;
         pageId?: string;
-    }): Promise<unknown>;
+    }): Promise<FacebookActionResult>;
     static getPostInsights(input: {
         postId: string;
         metrics?: string[];
-    }): Promise<unknown>;
+    }): Promise<MetaInsightsResult>;
     static getPageInsights(input: {
         pageId?: string;
         metrics?: string[];
         period?: "day" | "week" | "days_28";
-    }): Promise<unknown>;
+    }): Promise<MetaInsightsResult>;
     static uploadResumableVideo(input: {
         pageId?: string;
         fileSize: number;
         startOffset?: number;
-    }): Promise<unknown>;
+    }): Promise<FacebookResumableVideoResult>;
     static listPublishedPosts(input: {
         pageId?: string;
         limit?: number;
-    }): Promise<unknown>;
-    static scheduleInProcess(input: {
+    }): Promise<MetaListResult>;
+    static scheduleInProcess<T>(input: {
         publishAt: Date | string;
-        action: () => Promise<unknown>;
-    }): Promise<unknown>;
+        action: () => Promise<T>;
+    }): Promise<T>;
 }
 
 declare class LinkedIn {
@@ -221,76 +554,71 @@ declare class LinkedIn {
         author?: string;
         text: string;
         visibility?: "PUBLIC" | "CONNECTIONS";
-    }): Promise<unknown>;
+    }): Promise<LinkedInPostResult>;
     static createImagePost(input: {
         author?: string;
         text: string;
         mediaUrn: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInPostResult>;
     static createVideoPost(input: {
         author?: string;
         text: string;
         mediaUrn: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInPostResult>;
     static createCarouselPost(input: {
         author?: string;
         text: string;
         mediaUrns: string[];
-    }): Promise<unknown>;
+    }): Promise<LinkedInPostResult>;
     static schedulePost(input: {
         author?: string;
         text: string;
         publishAt: Date | string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInPostResult>;
     static commentOnPost(input: {
         actor?: string;
         objectUrn: string;
         message: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInPostResult>;
     static replyToComment(input: {
         actor?: string;
         parentCommentUrn: string;
         message: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInPostResult>;
     static deleteComment(input: {
         encodedCommentUrn: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInDeleteResult>;
     static likePost(input: {
         actor?: string;
         objectUrn: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInActionResult>;
     static unlikePost(input: {
         actorUrn?: string;
         encodedObjectUrn: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInDeleteResult>;
     static sendDirectMessage(input: {
         actor?: string;
         recipientUrn: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInActionResult>;
     static getPostAnalytics(input: {
         postUrn: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInAnalyticsResult>;
     static getOrganizationAnalytics(input: {
         orgUrn?: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInAnalyticsResult>;
     static registerUpload(input: {
         owner?: string;
         mediaType: "image" | "video";
         fileSize: number;
-    }): Promise<{
-        value: {
-            uploadMechanism: Record<string, unknown>;
-            asset: string;
-        };
-    }>;
+    }): Promise<LinkedInUploadRegistrationResult>;
     static uploadBinary(input: {
         uploadUrl: string;
         mediaPath: string;
-    }): Promise<axios.AxiosResponse<any, any, {}>>;
+    }): Promise<LinkedInBinaryUploadResult>;
     static deletePost(input: {
         encodedPostUrn: string;
-    }): Promise<unknown>;
+    }): Promise<LinkedInDeleteResult>;
 }
 
 declare class YouTube {
@@ -298,104 +626,104 @@ declare class YouTube {
         title: string;
         description?: string;
         privacyStatus?: "private" | "public" | "unlisted";
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static uploadBinary(input: {
         uploadUrl: string;
         mediaPath: string;
-    }): Promise<axios.AxiosResponse<any, any, {}>>;
+    }): Promise<YouTubeUploadBinaryResult>;
     static listMyVideos(input: {
         maxResults?: number;
-    }): Promise<unknown>;
+    }): Promise<YouTubeListVideosResult>;
     static updateVideoMetadata(input: {
         videoId: string;
         title?: string;
         description?: string;
         privacyStatus?: "private" | "public" | "unlisted";
-    }): Promise<unknown>;
+    }): Promise<YouTubeVideoMetadataResult>;
     static deleteVideo(input: {
         videoId: string;
-    }): Promise<unknown>;
+    }): Promise<YouTubeDeleteVideoResult>;
     static commentOnVideo(input: {
         videoId: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<YouTubeCommentResult>;
     static replyToComment(input: {
         parentCommentId: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<YouTubeCommentResult>;
     static likeVideo(input: {
         videoId: string;
-    }): Promise<unknown>;
+    }): Promise<YouTubeRatingResult>;
     static unlikeVideo(input: {
         videoId: string;
-    }): Promise<unknown>;
+    }): Promise<YouTubeRatingResult>;
     static createPlaylist(input: {
         title: string;
         description?: string;
         privacyStatus?: "private" | "public" | "unlisted";
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static addVideoToPlaylist(input: {
         playlistId: string;
         videoId: string;
-    }): Promise<unknown>;
+    }): Promise<MetaPublishResult>;
     static getChannelAnalytics(input: {
         startDate: string;
         endDate: string;
         metrics?: string;
-    }): Promise<any>;
+    }): Promise<YouTubeAnalyticsResult>;
     static scheduleVideoMetadataUpdate(input: {
         videoId: string;
         title?: string;
         description?: string;
         privacyStatus?: "private" | "public" | "unlisted";
         publishAt: Date | string;
-    }): Promise<unknown>;
+    }): Promise<YouTubeVideoMetadataResult>;
 }
 
 declare class TikTok {
     static createPost(input: {
         text: string;
         visibility?: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "SELF_ONLY";
-    }): Promise<unknown>;
+    }): Promise<TikTokPostResult>;
     static createVideoPost(input: {
         title: string;
         videoUrl: string;
         visibility?: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "SELF_ONLY";
-    }): Promise<unknown>;
+    }): Promise<TikTokPostResult>;
     static getPostStatus(input: {
         publishId: string;
-    }): Promise<unknown>;
+    }): Promise<TikTokPostResult>;
     static listVideos(input: {
         maxCount?: number;
-    }): Promise<unknown>;
+    }): Promise<TikTokListVideosResult>;
     static deleteVideo(input: {
         videoId: string;
-    }): Promise<unknown>;
+    }): Promise<TikTokDeleteVideoResult>;
     static commentOnVideo(input: {
         videoId: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<TikTokActionResult>;
     static replyToComment(input: {
         commentId: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<TikTokActionResult>;
     static likeVideo(input: {
         videoId: string;
-    }): Promise<unknown>;
+    }): Promise<TikTokActionResult>;
     static unlikeVideo(input: {
         videoId: string;
-    }): Promise<unknown>;
+    }): Promise<TikTokActionResult>;
     static getVideoAnalytics(input: {
         videoIds: string[];
-    }): Promise<unknown>;
+    }): Promise<TikTokAnalyticsResult>;
     static getProfileAnalytics(input: {
         fields?: string[];
-    }): Promise<unknown>;
+    }): Promise<TikTokAnalyticsResult>;
     static scheduleVideoPost(input: {
         title: string;
         videoUrl: string;
         publishAt: Date | string;
-    }): Promise<unknown>;
+    }): Promise<TikTokPostResult>;
 }
 
 declare class Pinterest {
@@ -405,207 +733,289 @@ declare class Pinterest {
         description?: string;
         link?: string;
         mediaSourceUrl: string;
-    }): Promise<unknown>;
+    }): Promise<PinterestMutationResult>;
     static createVideoPin(input: {
         boardId?: string;
         title: string;
         description?: string;
         mediaSourceUrl: string;
-    }): Promise<unknown>;
+    }): Promise<PinterestMutationResult>;
     static updatePin(input: {
         pinId: string;
         title?: string;
         description?: string;
         link?: string;
-    }): Promise<unknown>;
+    }): Promise<PinterestMutationResult>;
     static deletePin(input: {
         pinId: string;
-    }): Promise<unknown>;
+    }): Promise<PinterestDeleteResult>;
     static listPins(input: {
         boardId?: string;
         pageSize?: number;
-    }): Promise<unknown>;
+    }): Promise<PinterestListPinsResult>;
     static createBoard(input: {
         name: string;
         description?: string;
         privacy?: "PUBLIC" | "PROTECTED" | "SECRET";
-    }): Promise<unknown>;
+    }): Promise<PinterestMutationResult>;
     static listBoards(input: {
         pageSize?: number;
-    }): Promise<unknown>;
+    }): Promise<PinterestListBoardsResult>;
     static commentOnPin(input: {
         pinId: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<PinterestActionResult>;
     static replyToComment(input: {
         pinId: string;
         commentId: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<PinterestActionResult>;
     static getPinAnalytics(input: {
         pinId: string;
         startDate: string;
         endDate: string;
-    }): Promise<unknown>;
+    }): Promise<PinterestAnalyticsResult>;
     static getAccountAnalytics(input: {
         startDate: string;
         endDate: string;
-    }): Promise<unknown>;
+    }): Promise<PinterestAnalyticsResult>;
     static schedulePin(input: {
         title: string;
         mediaSourceUrl: string;
         boardId?: string;
         publishAt: Date | string;
-    }): Promise<unknown>;
+    }): Promise<PinterestMutationResult>;
 }
 
 declare class Bluesky {
     static postText(input: {
         text: string;
-    }): Promise<unknown>;
+    }): Promise<BlueskyRecordResult>;
     static postWithLink(input: {
         text: string;
         url: string;
-    }): Promise<unknown>;
+    }): Promise<BlueskyRecordResult>;
     static replyToPost(input: {
         text: string;
         rootUri: string;
         rootCid: string;
         parentUri: string;
         parentCid: string;
-    }): Promise<unknown>;
+    }): Promise<BlueskyRecordResult>;
     static likePost(input: {
         subjectUri: string;
         subjectCid: string;
-    }): Promise<unknown>;
+    }): Promise<BlueskyRecordResult>;
     static repost(input: {
         subjectUri: string;
         subjectCid: string;
-    }): Promise<unknown>;
+    }): Promise<BlueskyRecordResult>;
     static deleteRecord(input: {
         uri: string;
-    }): Promise<unknown>;
+    }): Promise<BlueskyDeleteResult>;
     static getAuthorFeed(input: {
         actorDidOrHandle: string;
         limit?: number;
-    }): Promise<unknown>;
+    }): Promise<BlueskyFeedResult>;
     static searchPosts(input: {
         query: string;
         limit?: number;
-    }): Promise<unknown>;
+    }): Promise<BlueskySearchResult>;
     static getPostThread(input: {
         uri: string;
         depth?: number;
-    }): Promise<unknown>;
+    }): Promise<BlueskyThreadResult>;
     static getNotificationFeed(input: {
         limit?: number;
-    }): Promise<unknown>;
+    }): Promise<BlueskyNotificationsResult>;
     static schedulePost(input: {
         text: string;
         publishAt: Date | string;
-    }): Promise<unknown>;
+    }): Promise<BlueskyRecordResult>;
 }
 
 declare class Mastodon {
     static createStatus(input: {
         text: string;
         visibility?: "public" | "unlisted" | "private" | "direct";
-    }): Promise<unknown>;
+    }): Promise<MastodonStatusResult>;
     static uploadMedia(input: {
         mediaPath: string;
         description?: string;
-    }): Promise<axios.AxiosResponse<any, any, {}>>;
+    }): Promise<MastodonMediaResult>;
     static createMediaStatus(input: {
         text: string;
         mediaIds: string[];
         visibility?: "public" | "unlisted" | "private" | "direct";
-    }): Promise<unknown>;
+    }): Promise<MastodonStatusResult>;
     static replyToStatus(input: {
         statusId: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<MastodonStatusResult>;
     static deleteStatus(input: {
         statusId: string;
-    }): Promise<unknown>;
+    }): Promise<MastodonDeleteStatusResult>;
     static favouriteStatus(input: {
         statusId: string;
-    }): Promise<unknown>;
+    }): Promise<MastodonStatusResult>;
     static unfavouriteStatus(input: {
         statusId: string;
-    }): Promise<unknown>;
+    }): Promise<MastodonStatusResult>;
     static boostStatus(input: {
         statusId: string;
-    }): Promise<unknown>;
+    }): Promise<MastodonStatusResult>;
     static unboostStatus(input: {
         statusId: string;
-    }): Promise<unknown>;
+    }): Promise<MastodonStatusResult>;
     static listMyStatuses(input: {
         limit?: number;
-    }): Promise<unknown>;
+    }): Promise<MastodonListStatusesResult>;
     static getStatusContext(input: {
         statusId: string;
-    }): Promise<unknown>;
+    }): Promise<MastodonContextResult>;
     static getAccountAnalytics(input: {
         instanceScope?: "day" | "week" | "month";
-    }): Promise<unknown>;
+    }): Promise<MastodonAccountAnalyticsResult>;
     static scheduleStatus(input: {
         text: string;
         publishAt: Date | string;
-    }): Promise<unknown>;
+    }): Promise<MastodonStatusResult>;
 }
 
 declare class Threads {
     static postText(input: {
         threadsUserId?: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<ThreadsPublishResult>;
     static postImage(input: {
         threadsUserId?: string;
         text?: string;
         imageUrl: string;
-    }): Promise<unknown>;
+    }): Promise<ThreadsPublishResult>;
     static postVideo(input: {
         threadsUserId?: string;
         text?: string;
         videoUrl: string;
-    }): Promise<unknown>;
+    }): Promise<ThreadsPublishResult>;
     static replyToThread(input: {
         threadsUserId?: string;
         threadId: string;
         text: string;
-    }): Promise<unknown>;
+    }): Promise<ThreadsPublishResult>;
     static deleteThread(input: {
         threadId: string;
-    }): Promise<unknown>;
+    }): Promise<ThreadsDeleteResult>;
     static getThread(input: {
         threadId: string;
         fields?: string[];
-    }): Promise<unknown>;
+    }): Promise<ThreadsThreadResult>;
     static listMyThreads(input: {
         threadsUserId?: string;
         limit?: number;
-    }): Promise<unknown>;
+    }): Promise<ThreadsListResult>;
     static getThreadInsights(input: {
         threadId: string;
         metrics?: string[];
-    }): Promise<unknown>;
+    }): Promise<ThreadsInsightsResult>;
     static getAccountInsights(input: {
         threadsUserId?: string;
         metrics?: string[];
         period?: "day" | "week" | "days_28";
-    }): Promise<unknown>;
+    }): Promise<ThreadsInsightsResult>;
     static likeThread(input: {
         threadId: string;
-    }): Promise<unknown>;
+    }): Promise<ThreadsActionResult>;
     static unlikeThread(input: {
         threadId: string;
-    }): Promise<unknown>;
+    }): Promise<ThreadsDeleteResult>;
     static scheduleTextPost(input: {
         threadsUserId?: string;
         text: string;
         publishAt: Date | string;
-    }): Promise<unknown>;
+    }): Promise<ThreadsPublishResult>;
 }
+
+declare function verifyMetaWebhookSignature(params: {
+    payload: string | Buffer;
+    signatureHeader?: string;
+    appSecret: string;
+}): boolean;
+declare function verifyXWebhookSignature(params: {
+    payload: string | Buffer;
+    signatureHeader?: string;
+    consumerSecret: string;
+}): boolean;
+
+type WebhookPlatform = "meta" | "x";
+interface NormalizedWebhookEvent {
+    platform: WebhookPlatform;
+    type: string;
+    id?: string;
+    timestamp?: number;
+    payload: unknown;
+    raw: unknown;
+}
+type WebhookHandler = (event: NormalizedWebhookEvent) => void | Promise<void>;
+
+declare function normalizeMetaWebhook(body: unknown): NormalizedWebhookEvent[];
+declare function normalizeXWebhook(body: unknown): NormalizedWebhookEvent[];
+declare function normalizeWebhook(platform: WebhookPlatform, body: unknown): NormalizedWebhookEvent[];
+
+declare class WebhookRouter {
+    private readonly handlers;
+    on(type: string, handler: WebhookHandler): this;
+    dispatch(events: NormalizedWebhookEvent[]): Promise<void>;
+    handle(platform: WebhookPlatform, body: unknown): Promise<void>;
+    handleMeta(params: {
+        payload: string | Buffer;
+        body: unknown;
+        signatureHeader?: string;
+        appSecret: string;
+    }): Promise<void>;
+    handleX(params: {
+        payload: string | Buffer;
+        body: unknown;
+        signatureHeader?: string;
+        consumerSecret: string;
+    }): Promise<void>;
+}
+
+interface QueueJob<T = unknown> {
+    id: string;
+    task: () => Promise<T>;
+}
+interface QueueJobHandle<T = unknown> {
+    id: string;
+    result: Promise<T>;
+}
+interface QueueAdapter {
+    enqueue<T>(job: QueueJob<T>): Promise<QueueJobHandle<T>>;
+    schedule<T>(job: QueueJob<T>, runAt: Date | string): Promise<QueueJobHandle<T>>;
+    cancel(jobId: string): boolean;
+}
+
+declare class InMemoryQueueAdapter implements QueueAdapter {
+    private readonly jobs;
+    enqueue<T>(job: QueueJob<T>): Promise<QueueJobHandle<T>>;
+    schedule<T>(job: QueueJob<T>, runAt: Date | string): Promise<QueueJobHandle<T>>;
+    cancel(jobId: string): boolean;
+}
+
+declare class BullMQAdapter implements QueueAdapter {
+    enqueue<T>(job: QueueJob<T>): Promise<QueueJobHandle<T>>;
+    schedule<T>(job: QueueJob<T>, _runAt: Date | string): Promise<QueueJobHandle<T>>;
+    cancel(_jobId: string): boolean;
+}
+
+declare class SQSAdapter implements QueueAdapter {
+    enqueue<T>(job: QueueJob<T>): Promise<QueueJobHandle<T>>;
+    schedule<T>(job: QueueJob<T>, _runAt: Date | string): Promise<QueueJobHandle<T>>;
+    cancel(_jobId: string): boolean;
+}
+
+declare function setQueueAdapter(adapter: QueueAdapter): void;
+declare function getQueueAdapter(): QueueAdapter;
+declare function resetQueueAdapter(): void;
 
 type Platform = "x" | "facebook" | "instagram" | "linkedin" | "youtube" | "tiktok" | "pinterest" | "bluesky" | "mastodon" | "threads";
 interface BaseResult<T = unknown> {
@@ -661,4 +1071,4 @@ declare class SocialError extends Error {
     }): SocialError;
 }
 
-export { type AnalyticsRange, type BaseResult, Bluesky, Facebook, Instagram, LinkedIn, Mastodon, type MediaUploadOptions, Pinterest, type Platform, type RetryOptions, type ScheduleOptions, SocialError, Threads, TikTok, X, YouTube };
+export { type AnalyticsRange, type BaseResult, Bluesky, type BlueskyDeleteResult, type BlueskyFeedResult, type BlueskyNotificationsResult, type BlueskyRecordResult, type BlueskySearchResult, type BlueskyThreadResult, BullMQAdapter, Facebook, type FacebookActionResult, type FacebookDeleteResult, type FacebookResumableVideoResult, type GenericActionResult, type GenericDeleteResult, type GenericPlatformResult, InMemoryQueueAdapter, Instagram, type InstagramDeleteResult, type InstagramModerationResult, type InstagramPublishingLimitResult, LinkedIn, type LinkedInActionResult, type LinkedInAnalyticsResult, type LinkedInBinaryUploadResult, type LinkedInDeleteResult, type LinkedInPostResult, type LinkedInUploadRegistrationResult, Mastodon, type MastodonAccountAnalyticsResult, type MastodonContextResult, type MastodonDeleteStatusResult, type MastodonListStatusesResult, type MastodonMediaResult, type MastodonStatusResult, type MediaUploadOptions, type MetaInsightsResult, type MetaListResult, type MetaPublishResult, type NormalizedWebhookEvent, Pinterest, type PinterestActionResult, type PinterestAnalyticsResult, type PinterestDeleteResult, type PinterestListBoardsResult, type PinterestListPinsResult, type PinterestMutationResult, type Platform, type QueueAdapter, type QueueJob, type QueueJobHandle, type RetryOptions, SQSAdapter, type ScheduleOptions, SocialError, Threads, type ThreadsActionResult, type ThreadsDeleteResult, type ThreadsInsightsResult, type ThreadsListResult, type ThreadsPublishResult, type ThreadsThreadResult, TikTok, type TikTokActionResult, type TikTokAnalyticsResult, type TikTokDeleteVideoResult, type TikTokListVideosResult, type TikTokPostResult, type WebhookHandler, type WebhookPlatform, WebhookRouter, X, type XActionResult, type XDeleteTweetResult, type XPostResult, type XThreadResult, type XTweetAnalyticsResult, type XUploadMediaResult, YouTube, type YouTubeAnalyticsResult, type YouTubeCommentResult, type YouTubeDeleteVideoResult, type YouTubeListVideosResult, type YouTubeRatingResult, type YouTubeUploadBinaryResult, type YouTubeVideoMetadataResult, getQueueAdapter, normalizeMetaWebhook, normalizeWebhook, normalizeXWebhook, resetQueueAdapter, setQueueAdapter, verifyMetaWebhookSignature, verifyXWebhookSignature };

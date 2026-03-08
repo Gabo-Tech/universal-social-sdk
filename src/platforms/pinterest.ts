@@ -1,9 +1,22 @@
 import axios from "axios";
 import { env } from "../config/env.js";
 import { SocialError } from "../errors/SocialError.js";
+import {
+  normalizeActionResult,
+  normalizeDeleteResult,
+  normalizeMutationResult
+} from "../utils/normalizedResult.js";
 import { withRetries } from "../utils/retry.js";
 import { scheduleTask } from "../utils/scheduler.js";
 import { validatePlatformInput } from "../validation/platformSchemas.js";
+import type {
+  PinterestActionResult,
+  PinterestAnalyticsResult,
+  PinterestDeleteResult,
+  PinterestListPinsResult,
+  PinterestListBoardsResult,
+  PinterestMutationResult
+} from "../responseTypes.js";
 
 const PINTEREST_BASE = "https://api.pinterest.com/v5";
 
@@ -59,9 +72,9 @@ export class Pinterest {
     description?: string;
     link?: string;
     mediaSourceUrl: string;
-  }) {
+  }): Promise<PinterestMutationResult> {
     validatePlatformInput("pinterest", "createPin", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: "/pins",
       method: "POST",
       data: {
@@ -75,6 +88,7 @@ export class Pinterest {
         }
       }
     });
+    return normalizeMutationResult({ platform: "pinterest", raw });
   }
 
   static async createVideoPin(input: {
@@ -82,9 +96,9 @@ export class Pinterest {
     title: string;
     description?: string;
     mediaSourceUrl: string;
-  }) {
+  }): Promise<PinterestMutationResult> {
     validatePlatformInput("pinterest", "createVideoPin", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: "/pins",
       method: "POST",
       data: {
@@ -97,6 +111,7 @@ export class Pinterest {
         }
       }
     });
+    return normalizeMutationResult({ platform: "pinterest", raw });
   }
 
   static async updatePin(input: {
@@ -104,9 +119,9 @@ export class Pinterest {
     title?: string;
     description?: string;
     link?: string;
-  }) {
+  }): Promise<PinterestMutationResult> {
     validatePlatformInput("pinterest", "updatePin", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: `/pins/${input.pinId}`,
       method: "PATCH",
       data: {
@@ -115,17 +130,28 @@ export class Pinterest {
         link: input.link
       }
     });
-  }
-
-  static async deletePin(input: { pinId: string }) {
-    validatePlatformInput("pinterest", "deletePin", input);
-    return pinterestRequest({
-      endpoint: `/pins/${input.pinId}`,
-      method: "DELETE"
+    return normalizeMutationResult({
+      platform: "pinterest",
+      resourceId: input.pinId,
+      raw
     });
   }
 
-  static async listPins(input: { boardId?: string; pageSize?: number }) {
+  static async deletePin(
+    input: { pinId: string }
+  ): Promise<PinterestDeleteResult> {
+    validatePlatformInput("pinterest", "deletePin", input);
+    const raw = await pinterestRequest({
+      endpoint: `/pins/${input.pinId}`,
+      method: "DELETE"
+    });
+    return normalizeDeleteResult({ platform: "pinterest", targetId: input.pinId, raw });
+  }
+
+  static async listPins(input: {
+    boardId?: string;
+    pageSize?: number;
+  }): Promise<PinterestListPinsResult> {
     validatePlatformInput("pinterest", "listPins", input);
     return pinterestRequest({
       endpoint: "/pins",
@@ -141,9 +167,9 @@ export class Pinterest {
     name: string;
     description?: string;
     privacy?: "PUBLIC" | "PROTECTED" | "SECRET";
-  }) {
+  }): Promise<PinterestMutationResult> {
     validatePlatformInput("pinterest", "createBoard", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: "/boards",
       method: "POST",
       data: {
@@ -152,9 +178,12 @@ export class Pinterest {
         privacy: input.privacy ?? "PUBLIC"
       }
     });
+    return normalizeMutationResult({ platform: "pinterest", raw });
   }
 
-  static async listBoards(input: { pageSize?: number }) {
+  static async listBoards(
+    input: { pageSize?: number }
+  ): Promise<PinterestListBoardsResult> {
     validatePlatformInput("pinterest", "listBoards", input);
     return pinterestRequest({
       endpoint: "/boards",
@@ -163,25 +192,42 @@ export class Pinterest {
     });
   }
 
-  static async commentOnPin(input: { pinId: string; text: string }) {
+  static async commentOnPin(input: {
+    pinId: string;
+    text: string;
+  }): Promise<PinterestActionResult> {
     validatePlatformInput("pinterest", "commentOnPin", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: `/pins/${input.pinId}/comments`,
       method: "POST",
       data: { text: input.text }
     });
+    return normalizeActionResult({ platform: "pinterest", action: "commentOnPin", raw });
   }
 
-  static async replyToComment(input: { pinId: string; commentId: string; text: string }) {
+  static async replyToComment(input: {
+    pinId: string;
+    commentId: string;
+    text: string;
+  }): Promise<PinterestActionResult> {
     validatePlatformInput("pinterest", "replyToComment", input);
-    return pinterestRequest({
+    const raw = await pinterestRequest({
       endpoint: `/pins/${input.pinId}/comments/${input.commentId}/replies`,
       method: "POST",
       data: { text: input.text }
     });
+    return normalizeActionResult({
+      platform: "pinterest",
+      action: "replyToComment",
+      raw
+    });
   }
 
-  static async getPinAnalytics(input: { pinId: string; startDate: string; endDate: string }) {
+  static async getPinAnalytics(input: {
+    pinId: string;
+    startDate: string;
+    endDate: string;
+  }): Promise<PinterestAnalyticsResult> {
     validatePlatformInput("pinterest", "getPinAnalytics", input);
     return pinterestRequest({
       endpoint: `/pins/${input.pinId}/analytics`,
@@ -190,7 +236,10 @@ export class Pinterest {
     });
   }
 
-  static async getAccountAnalytics(input: { startDate: string; endDate: string }) {
+  static async getAccountAnalytics(input: {
+    startDate: string;
+    endDate: string;
+  }): Promise<PinterestAnalyticsResult> {
     validatePlatformInput("pinterest", "getAccountAnalytics", input);
     return pinterestRequest({
       endpoint: "/user_account/analytics",
@@ -204,9 +253,9 @@ export class Pinterest {
     mediaSourceUrl: string;
     boardId?: string;
     publishAt: Date | string;
-  }) {
+  }): Promise<PinterestMutationResult> {
     validatePlatformInput("pinterest", "schedulePin", input);
-    return scheduleTask({
+    const raw = await scheduleTask({
       id: `pinterest-schedule-${Date.now()}`,
       runAt: input.publishAt,
       task: async () =>
@@ -216,5 +265,6 @@ export class Pinterest {
           boardId: input.boardId
         })
     });
+    return normalizeMutationResult({ platform: "pinterest", raw });
   }
 }

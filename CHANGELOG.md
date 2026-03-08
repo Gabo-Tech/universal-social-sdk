@@ -7,6 +7,43 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Non-interactive updater mode for CI/automation (`--ci`, `--open-pr`, `--branch-prefix`, `--base`, `--artifacts-dir`).
+- Structured updater artifacts (`.artifacts/update-plan.json`, `.artifacts/update-diff-summary.json`, `.artifacts/pr-title.txt`, `.artifacts/pr-body.md`).
+- Strict Ollama patch-plan schema validation with typed `changes` metadata (platform, endpoint, change type, confidence).
+- Scheduled PR automation workflow: `.github/workflows/auto-update-pr.yml`.
+- Workflow-dispatch `dry_run` mode for updater automation (detect and generate artifacts without opening PRs).
+- Unit tests covering updater plan validation and no-change detection behavior.
+
+### Changed
+
+- Updater CI mode now enforces `npm run build` and `npm run test:unit` before PR automation proceeds.
+- Auto-update PR workflow now excludes `.artifacts/*` from commits while still using artifacts for PR metadata.
+
+## [1.1.0] - 2026-03-08
+
+### Added
+
+- `src/webhooks` module with:
+  - Meta and X signature verification helpers
+  - normalized webhook event parsing helpers
+  - `WebhookRouter` for typed and wildcard event dispatch
+- Unit tests for webhook verification, normalization, and routing.
+- `src/queue` module with:
+  - `QueueAdapter` interface
+  - `InMemoryQueueAdapter`
+  - skeleton adapters for BullMQ and SQS
+  - queue adapter registry (`setQueueAdapter`, `getQueueAdapter`, `resetQueueAdapter`)
+- Scheduler integration to route scheduled jobs through the active queue adapter.
+- Unit tests for queue adapter registry and scheduler behavior.
+- Added typed response interfaces and explicit return contracts across all public platform methods.
+- Refined response contracts with platform-specific action/delete/result aliases for stronger API clarity.
+- Added internal normalized result helpers so action/delete/mutation/detail responses remain stable even if upstream provider payloads drift.
+- Added `docs/RESPONSE_CONTRACTS.md` with stable contract reference and integration guidance.
+- Exported response interfaces from package root.
+- Unit test coverage for typed response shapes.
+
 ## [1.0.1] - 2026-03-08
 
 ### Added

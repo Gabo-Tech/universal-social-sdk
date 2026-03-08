@@ -1,8 +1,21 @@
 import { env } from "../config/env.js";
 import { SocialError } from "../errors/SocialError.js";
 import { metaCall } from "./shared/metaClient.js";
+import {
+  normalizeActionResult,
+  normalizeDeleteResult,
+  normalizeMutationResult
+} from "../utils/normalizedResult.js";
 import { scheduleTask } from "../utils/scheduler.js";
 import { validatePlatformInput } from "../validation/platformSchemas.js";
+import type {
+  FacebookActionResult,
+  FacebookDeleteResult,
+  FacebookResumableVideoResult,
+  MetaInsightsResult,
+  MetaListResult,
+  MetaPublishResult
+} from "../responseTypes.js";
 
 function pageIdOrThrow(inputPageId?: string): string {
   const pageId = inputPageId ?? env.meta.fbPageId;
@@ -22,7 +35,7 @@ export class Facebook {
     message: string;
     link?: string;
     photoUrl?: string;
-  }) {
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("facebook", "publishToPage", input);
     const pageId = pageIdOrThrow(input.pageId);
     return metaCall({
@@ -37,7 +50,11 @@ export class Facebook {
     });
   }
 
-  static async publishPhoto(input: { pageId?: string; url: string; caption?: string }) {
+  static async publishPhoto(input: {
+    pageId?: string;
+    url: string;
+    caption?: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("facebook", "publishPhoto", input);
     const pageId = pageIdOrThrow(input.pageId);
     return metaCall({
@@ -48,7 +65,12 @@ export class Facebook {
     });
   }
 
-  static async publishVideo(input: { pageId?: string; fileUrl: string; description?: string; title?: string }) {
+  static async publishVideo(input: {
+    pageId?: string;
+    fileUrl: string;
+    description?: string;
+    title?: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("facebook", "publishVideo", input);
     const pageId = pageIdOrThrow(input.pageId);
     return metaCall({
@@ -63,7 +85,11 @@ export class Facebook {
     });
   }
 
-  static async publishCarousel(input: { pageId?: string; message: string; photoUrls: string[] }) {
+  static async publishCarousel(input: {
+    pageId?: string;
+    message: string;
+    photoUrls: string[];
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("facebook", "publishCarousel", input);
     const pageId = pageIdOrThrow(input.pageId);
     const mediaIds: string[] = [];
@@ -87,7 +113,10 @@ export class Facebook {
     });
   }
 
-  static async publishStory(input: { pageId?: string; photoUrl: string }) {
+  static async publishStory(input: {
+    pageId?: string;
+    photoUrl: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("facebook", "publishStory", input);
     const pageId = pageIdOrThrow(input.pageId);
     return metaCall({
@@ -98,7 +127,11 @@ export class Facebook {
     });
   }
 
-  static async schedulePost(input: { pageId?: string; message: string; publishAt: Date | string }) {
+  static async schedulePost(input: {
+    pageId?: string;
+    message: string;
+    publishAt: Date | string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("facebook", "schedulePost", input);
     const pageId = pageIdOrThrow(input.pageId);
     const publishTime = Math.floor(new Date(input.publishAt).getTime() / 1000);
@@ -114,7 +147,10 @@ export class Facebook {
     });
   }
 
-  static async commentOnPost(input: { postId: string; message: string }) {
+  static async commentOnPost(input: {
+    postId: string;
+    message: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("facebook", "commentOnPost", input);
     return metaCall({
       platform: "facebook",
@@ -124,7 +160,10 @@ export class Facebook {
     });
   }
 
-  static async replyToComment(input: { commentId: string; message: string }) {
+  static async replyToComment(input: {
+    commentId: string;
+    message: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("facebook", "replyToComment", input);
     return metaCall({
       platform: "facebook",
@@ -134,28 +173,38 @@ export class Facebook {
     });
   }
 
-  static async likeObject(input: { objectId: string }) {
+  static async likeObject(input: {
+    objectId: string;
+  }): Promise<FacebookActionResult> {
     validatePlatformInput("facebook", "likeObject", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "facebook",
       method: "POST",
       endpoint: `/${input.objectId}/likes`
     });
+    return normalizeActionResult({ platform: "facebook", action: "likeObject", raw });
   }
 
-  static async deletePost(input: { objectId: string }) {
+  static async deletePost(input: {
+    objectId: string;
+  }): Promise<FacebookDeleteResult> {
     validatePlatformInput("facebook", "deletePost", input);
-    return metaCall({
+    const raw = await metaCall({
       platform: "facebook",
       method: "DELETE",
       endpoint: `/${input.objectId}`
     });
+    return normalizeDeleteResult({ platform: "facebook", targetId: input.objectId, raw });
   }
 
-  static async sendPageMessage(input: { recipientPsid: string; message: string; pageId?: string }) {
+  static async sendPageMessage(input: {
+    recipientPsid: string;
+    message: string;
+    pageId?: string;
+  }): Promise<FacebookActionResult> {
     validatePlatformInput("facebook", "sendPageMessage", input);
     const pageId = pageIdOrThrow(input.pageId);
-    return metaCall({
+    const raw = await metaCall({
       platform: "facebook",
       method: "POST",
       endpoint: `/${pageId}/messages`,
@@ -165,9 +214,13 @@ export class Facebook {
         messaging_type: "RESPONSE"
       }
     });
+    return normalizeActionResult({ platform: "facebook", action: "sendPageMessage", raw });
   }
 
-  static async getPostInsights(input: { postId: string; metrics?: string[] }) {
+  static async getPostInsights(input: {
+    postId: string;
+    metrics?: string[];
+  }): Promise<MetaInsightsResult> {
     validatePlatformInput("facebook", "getPostInsights", input);
     return metaCall({
       platform: "facebook",
@@ -177,7 +230,11 @@ export class Facebook {
     });
   }
 
-  static async getPageInsights(input: { pageId?: string; metrics?: string[]; period?: "day" | "week" | "days_28" }) {
+  static async getPageInsights(input: {
+    pageId?: string;
+    metrics?: string[];
+    period?: "day" | "week" | "days_28";
+  }): Promise<MetaInsightsResult> {
     validatePlatformInput("facebook", "getPageInsights", input);
     const pageId = pageIdOrThrow(input.pageId);
     return metaCall({
@@ -191,10 +248,14 @@ export class Facebook {
     });
   }
 
-  static async uploadResumableVideo(input: { pageId?: string; fileSize: number; startOffset?: number }) {
+  static async uploadResumableVideo(input: {
+    pageId?: string;
+    fileSize: number;
+    startOffset?: number;
+  }): Promise<FacebookResumableVideoResult> {
     validatePlatformInput("facebook", "uploadResumableVideo", input);
     const pageId = pageIdOrThrow(input.pageId);
-    return metaCall({
+    const raw = await metaCall({
       platform: "facebook",
       method: "POST",
       endpoint: `/${pageId}/videos`,
@@ -204,9 +265,13 @@ export class Facebook {
         start_offset: input.startOffset ?? 0
       }
     });
+    return normalizeMutationResult({ platform: "facebook", raw });
   }
 
-  static async listPublishedPosts(input: { pageId?: string; limit?: number }) {
+  static async listPublishedPosts(input: {
+    pageId?: string;
+    limit?: number;
+  }): Promise<MetaListResult> {
     validatePlatformInput("facebook", "listPublishedPosts", input);
     const pageId = pageIdOrThrow(input.pageId);
     return metaCall({
@@ -217,7 +282,10 @@ export class Facebook {
     });
   }
 
-  static async scheduleInProcess(input: { publishAt: Date | string; action: () => Promise<unknown> }) {
+  static async scheduleInProcess<T>(input: {
+    publishAt: Date | string;
+    action: () => Promise<T>;
+  }): Promise<T> {
     return scheduleTask({
       id: `facebook-schedule-${Date.now()}`,
       runAt: input.publishAt,

@@ -1,0 +1,137 @@
+name: Auto Update PR
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run detection only (no branch, commit, or PR)"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-update-pr
+  cancel-in-progress: false
+
+jobs:
+  updater:
+    name: Detect API doc changes and open PR
+    runs-on: ubuntu-latest
+    env:
+      OLLAMA_HOST: ${{ secrets.OLLAMA_HOST }}
+      OLLAMA_MODEL: ${{ secrets.OLLAMA_MODEL }}
+    steps:
+      - name: Check updater secret availability
+        id: gate
+        run: |
+          if [ -z "$OLLAMA_HOST" ]; then
+            echo "can_run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping updater workflow. Missing OLLAMA_HOST secret."
+          else
+            echo "can_run=true" >> "$GITHUB_OUTPUT"
+            echo "Updater secrets are present."
+          fi
+
+      - name: Checkout
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
+        run: npm ci
+
+      - name: Run updater in CI PR mode
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
+        env:
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          npm run build
+          DRY_RUN_FLAG=""
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_DRY_RUN" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+            echo "Running updater in detection-only mode."
+          fi
+          node dist/cli/index.js update --ci --open-pr --yes --base main --branch-prefix chore/updater --artifacts-dir .artifacts $DRY_RUN_FLAG
+
+      - name: Read updater artifact state
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
+        id: artifact
+        env:
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          node -e '
+          const fs = require("node:fs");
+          const summary = JSON.parse(fs.readFileSync(".artifacts/update-diff-summary.json", "utf8"));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `has_changes=${summary.hasChanges}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `branch_name=${summary.pr.branchName}\n`);
+          const isDryRun = process.env.GITHUB_EVENT_NAME === "workflow_dispatch" && process.env.INPUT_DRY_RUN === "true";
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `is_dry_run=${isDryRun}\n`);
+          '
+
+      - name: Create branch and commit updates
+        if: ${{ steps.gate.outputs.can_run == 'true' && steps.artifact.outputs.has_changes == 'true' && steps.artifact.outputs.is_dry_run != 'true' }}
+        run: |
+          git checkout -b "${{ steps.artifact.outputs.branch_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git restore --staged .artifacts || true
+          if git diff --cached --quiet; then
+            echo "No staged changes after updater run."
+            exit 0
+          fi
+          git commit -m "chore(updater): sync social API documentation changes"
+          git push -u origin "${{ steps.artifact.outputs.branch_name }}"
+
+      - name: Open pull request
+        if: ${{ steps.gate.outputs.can_run == 'true' && steps.artifact.outputs.has_changes == 'true' && steps.artifact.outputs.is_dry_run != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh pr list --head "${{ steps.artifact.outputs.branch_name }}" --state open --json number --jq 'length' | grep -q '^0$'; then
+            gh pr create \
+              --title "$(cat .artifacts/pr-title.txt)" \
+              --body-file ".artifacts/pr-body.md" \
+              --base "main" \
+              --head "${{ steps.artifact.outputs.branch_name }}"
+          else
+            echo "PR already exists for branch ${{ steps.artifact.outputs.branch_name }}."
+          fi
+
+      - name: Write workflow summary
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
+        env:
+          HAS_CHANGES: ${{ steps.artifact.outputs.has_changes }}
+          IS_DRY_RUN: ${{ steps.artifact.outputs.is_dry_run }}
+          BRANCH_NAME: ${{ steps.artifact.outputs.branch_name }}
+        run: |
+          {
+            echo "## Auto Update PR Summary"
+            echo ""
+            echo "- Event: \`${GITHUB_EVENT_NAME}\`"
+            echo "- Dry run: \`${IS_DRY_RUN}\`"
+            echo "- Changes detected: \`${HAS_CHANGES}\`"
+            echo "- Branch: \`${BRANCH_NAME}\`"
+            if [ "$HAS_CHANGES" != "true" ]; then
+              echo "- Result: No changes detected. No PR created."
+            elif [ "$IS_DRY_RUN" = "true" ]; then
+              echo "- Result: Dry-run mode. PR creation intentionally skipped."
+            else
+              echo "- Result: Changes detected and PR creation path executed."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

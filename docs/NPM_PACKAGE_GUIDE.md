@@ -80,6 +80,7 @@ npx universal-social-sdk update
 
 - `init` helps first-time setup.
 - `update` runs the docs-to-patch flow with a local model runtime.
+- `update --ci --open-pr` runs non-interactive mode for automation and writes PR artifacts to `.artifacts/`.
 
 ## 6) CI and release model
 
@@ -90,6 +91,12 @@ npx universal-social-sdk update
 - `release.yml`
   - Publishes to npm when a `v*` tag is pushed or manual publish is triggered.
   - Requires `NPM_TOKEN`.
+
+- `auto-update-pr.yml`
+  - Runs on schedule/manual dispatch.
+  - Executes updater in CI PR mode, validates build/tests, then opens a PR if changes exist.
+  - Supports `workflow_dispatch` dry-run input for detection-only runs (no branch/PR).
+  - Requires `OLLAMA_HOST` secret (and optional `OLLAMA_MODEL`).
 
 ## 7) Publish checklist
 

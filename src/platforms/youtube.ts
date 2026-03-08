@@ -2,9 +2,24 @@ import axios from "axios";
 import { env } from "../config/env.js";
 import { SocialError } from "../errors/SocialError.js";
 import { createUploadStream, getFileMeta } from "../utils/file.js";
+import {
+  normalizeActionResult,
+  normalizeDeleteResult,
+  normalizeMutationResult
+} from "../utils/normalizedResult.js";
 import { withRetries } from "../utils/retry.js";
 import { scheduleTask } from "../utils/scheduler.js";
 import { validatePlatformInput } from "../validation/platformSchemas.js";
+import type {
+  MetaPublishResult,
+  YouTubeAnalyticsResult,
+  YouTubeListVideosResult,
+  YouTubeUploadBinaryResult,
+  YouTubeCommentResult,
+  YouTubeDeleteVideoResult,
+  YouTubeRatingResult,
+  YouTubeVideoMetadataResult
+} from "../responseTypes.js";
 
 const YT_API_BASE = "https://www.googleapis.com/youtube/v3";
 const YT_UPLOAD_BASE = "https://www.googleapis.com/upload/youtube/v3";
@@ -61,7 +76,7 @@ export class YouTube {
     title: string;
     description?: string;
     privacyStatus?: "private" | "public" | "unlisted";
-  }) {
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("youtube", "createVideoUploadSession", input);
     return youtubeRequest({
       endpoint: "/videos",
@@ -78,10 +93,13 @@ export class YouTube {
     });
   }
 
-  static async uploadBinary(input: { uploadUrl: string; mediaPath: string }) {
+  static async uploadBinary(input: {
+    uploadUrl: string;
+    mediaPath: string;
+  }): Promise<YouTubeUploadBinaryResult> {
     validatePlatformInput("youtube", "uploadBinary", input);
     const { fileSize } = getFileMeta(input.mediaPath);
-    return withRetries({
+    await withRetries({
       platform: "youtube",
       endpoint: "uploadBinary",
       execute: async () =>
@@ -94,9 +112,12 @@ export class YouTube {
           }
         })
     });
+    return { bytesUploaded: fileSize };
   }
 
-  static async listMyVideos(input: { maxResults?: number }) {
+  static async listMyVideos(
+    input: { maxResults?: number }
+  ): Promise<YouTubeListVideosResult> {
     validatePlatformInput("youtube", "listMyVideos", input);
     return youtubeRequest({
       endpoint: "/search",
@@ -115,9 +136,9 @@ export class YouTube {
     title?: string;
     description?: string;
     privacyStatus?: "private" | "public" | "unlisted";
-  }) {
+  }): Promise<YouTubeVideoMetadataResult> {
     validatePlatformInput("youtube", "updateVideoMetadata", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/videos",
       method: "PUT",
       query: { part: "snippet,status" },
@@ -132,20 +153,31 @@ export class YouTube {
         }
       }
     });
+    return normalizeMutationResult({
+      platform: "youtube",
+      resourceId: input.videoId,
+      raw
+    });
   }
 
-  static async deleteVideo(input: { videoId: string }) {
+  static async deleteVideo(
+    input: { videoId: string }
+  ): Promise<YouTubeDeleteVideoResult> {
     validatePlatformInput("youtube", "deleteVideo", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/videos",
       method: "DELETE",
       query: { id: input.videoId }
     });
+    return normalizeDeleteResult({ platform: "youtube", targetId: input.videoId, raw });
   }
 
-  static async commentOnVideo(input: { videoId: string; text: string }) {
+  static async commentOnVideo(input: {
+    videoId: string;
+    text: string;
+  }): Promise<YouTubeCommentResult> {
     validatePlatformInput("youtube", "commentOnVideo", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/commentThreads",
       method: "POST",
       query: { part: "snippet" },
@@ -158,11 +190,15 @@ export class YouTube {
         }
       }
     });
+    return normalizeMutationResult({ platform: "youtube", resourceId: input.videoId, raw });
   }
 
-  static async replyToComment(input: { parentCommentId: string; text: string }) {
+  static async replyToComment(input: {
+    parentCommentId: string;
+    text: string;
+  }): Promise<YouTubeCommentResult> {
     validatePlatformInput("youtube", "replyToComment", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/comments",
       method: "POST",
       query: { part: "snippet" },
@@ -173,31 +209,42 @@ export class YouTube {
         }
       }
     });
+    return normalizeMutationResult({
+      platform: "youtube",
+      resourceId: input.parentCommentId,
+      raw
+    });
   }
 
-  static async likeVideo(input: { videoId: string }) {
+  static async likeVideo(input: {
+    videoId: string;
+  }): Promise<YouTubeRatingResult> {
     validatePlatformInput("youtube", "likeVideo", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/videos/rate",
       method: "POST",
       query: { id: input.videoId, rating: "like" }
     });
+    return normalizeActionResult({ platform: "youtube", action: "likeVideo", raw });
   }
 
-  static async unlikeVideo(input: { videoId: string }) {
+  static async unlikeVideo(input: {
+    videoId: string;
+  }): Promise<YouTubeRatingResult> {
     validatePlatformInput("youtube", "unlikeVideo", input);
-    return youtubeRequest({
+    const raw = await youtubeRequest({
       endpoint: "/videos/rate",
       method: "POST",
       query: { id: input.videoId, rating: "none" }
     });
+    return normalizeActionResult({ platform: "youtube", action: "unlikeVideo", raw });
   }
 
   static async createPlaylist(input: {
     title: string;
     description?: string;
     privacyStatus?: "private" | "public" | "unlisted";
-  }) {
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("youtube", "createPlaylist", input);
     return youtubeRequest({
       endpoint: "/playlists",
@@ -213,7 +260,10 @@ export class YouTube {
     });
   }
 
-  static async addVideoToPlaylist(input: { playlistId: string; videoId: string }) {
+  static async addVideoToPlaylist(input: {
+    playlistId: string;
+    videoId: string;
+  }): Promise<MetaPublishResult> {
     validatePlatformInput("youtube", "addVideoToPlaylist", input);
     return youtubeRequest({
       endpoint: "/playlistItems",
@@ -235,7 +285,7 @@ export class YouTube {
     startDate: string;
     endDate: string;
     metrics?: string;
-  }) {
+  }): Promise<YouTubeAnalyticsResult> {
     validatePlatformInput("youtube", "getChannelAnalytics", input);
     return withRetries({
       platform: "youtube",
@@ -261,7 +311,7 @@ export class YouTube {
     description?: string;
     privacyStatus?: "private" | "public" | "unlisted";
     publishAt: Date | string;
-  }) {
+  }): Promise<YouTubeVideoMetadataResult> {
     validatePlatformInput("youtube", "scheduleVideoMetadataUpdate", input);
     return scheduleTask({
       id: `youtube-schedule-${Date.now()}`,

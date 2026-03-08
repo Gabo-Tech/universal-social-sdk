@@ -2,9 +2,21 @@ import axios from "axios";
 import { env } from "../config/env.js";
 import { SocialError } from "../errors/SocialError.js";
 import { createUploadStream, getFileMeta } from "../utils/file.js";
+import {
+  normalizeDeleteResult,
+  normalizeDetailResult
+} from "../utils/normalizedResult.js";
 import { withRetries } from "../utils/retry.js";
 import { scheduleTask } from "../utils/scheduler.js";
 import { validatePlatformInput } from "../validation/platformSchemas.js";
+import type {
+  MastodonAccountAnalyticsResult,
+  MastodonContextResult,
+  MastodonDeleteStatusResult,
+  MastodonListStatusesResult,
+  MastodonMediaResult,
+  MastodonStatusResult
+} from "../responseTypes.js";
 
 function baseUrl() {
   if (!env.mastodon.baseUrl) {
@@ -64,7 +76,10 @@ async function mastodonRequest<T = unknown>(params: {
 }
 
 export class Mastodon {
-  static async createStatus(input: { text: string; visibility?: "public" | "unlisted" | "private" | "direct" }) {
+  static async createStatus(input: {
+    text: string;
+    visibility?: "public" | "unlisted" | "private" | "direct";
+  }): Promise<MastodonStatusResult> {
     validatePlatformInput("mastodon", "createStatus", input);
     return mastodonRequest({
       endpoint: "/statuses",
@@ -76,21 +91,30 @@ export class Mastodon {
     });
   }
 
-  static async uploadMedia(input: { mediaPath: string; description?: string }) {
+  static async uploadMedia(input: {
+    mediaPath: string;
+    description?: string;
+  }): Promise<MastodonMediaResult> {
     validatePlatformInput("mastodon", "uploadMedia", input);
     const { fileSize } = getFileMeta(input.mediaPath);
 
     return withRetries({
       platform: "mastodon",
       endpoint: "/media",
-      execute: async () =>
-        axios.post(`${baseUrl()}/api/v2/media`, createUploadStream(input.mediaPath), {
-          headers: mastodonHeaders({
-            "Content-Length": String(fileSize),
-            "Content-Type": "application/octet-stream"
-          }),
-          maxBodyLength: Infinity
-        })
+      execute: async () => {
+        const response = await axios.post(
+          `${baseUrl()}/api/v2/media`,
+          createUploadStream(input.mediaPath),
+          {
+            headers: mastodonHeaders({
+              "Content-Length": String(fileSize),
+              "Content-Type": "application/octet-stream"
+            }),
+            maxBodyLength: Infinity
+          }
+        );
+        return response.data as MastodonMediaResult;
+      }
     });
   }
 
@@ -98,7 +122,7 @@ export class Mastodon {
     text: string;
     mediaIds: string[];
     visibility?: "public" | "unlisted" | "private" | "direct";
-  }) {
+  }): Promise<MastodonStatusResult> {
     validatePlatformInput("mastodon", "createMediaStatus", input);
     return mastodonRequest({
       endpoint: "/statuses",
@@ -111,7 +135,10 @@ export class Mastodon {
     });
   }
 
-  static async replyToStatus(input: { statusId: string; text: string }) {
+  static async replyToStatus(input: {
+    statusId: string;
+    text: string;
+  }): Promise<MastodonStatusResult> {
     validatePlatformInput("mastodon", "replyToStatus", input);
     return mastodonRequest({
       endpoint: "/statuses",
@@ -123,15 +150,20 @@ export class Mastodon {
     });
   }
 
-  static async deleteStatus(input: { statusId: string }) {
+  static async deleteStatus(
+    input: { statusId: string }
+  ): Promise<MastodonDeleteStatusResult> {
     validatePlatformInput("mastodon", "deleteStatus", input);
-    return mastodonRequest({
+    const raw = await mastodonRequest({
       endpoint: `/statuses/${input.statusId}`,
       method: "DELETE"
     });
+    return normalizeDeleteResult({ platform: "mastodon", targetId: input.statusId, raw });
   }
 
-  static async favouriteStatus(input: { statusId: string }) {
+  static async favouriteStatus(input: {
+    statusId: string;
+  }): Promise<MastodonStatusResult> {
     validatePlatformInput("mastodon", "favouriteStatus", input);
     return mastodonRequest({
       endpoint: `/statuses/${input.statusId}/favourite`,
@@ -139,7 +171,9 @@ export class Mastodon {
     });
   }
 
-  static async unfavouriteStatus(input: { statusId: string }) {
+  static async unfavouriteStatus(input: {
+    statusId: string;
+  }): Promise<MastodonStatusResult> {
     validatePlatformInput("mastodon", "unfavouriteStatus", input);
     return mastodonRequest({
       endpoint: `/statuses/${input.statusId}/unfavourite`,
@@ -147,7 +181,9 @@ export class Mastodon {
     });
   }
 
-  static async boostStatus(input: { statusId: string }) {
+  static async boostStatus(input: {
+    statusId: string;
+  }): Promise<MastodonStatusResult> {
     validatePlatformInput("mastodon", "boostStatus", input);
     return mastodonRequest({
       endpoint: `/statuses/${input.statusId}/reblog`,
@@ -155,7 +191,9 @@ export class Mastodon {
     });
   }
 
-  static async unboostStatus(input: { statusId: string }) {
+  static async unboostStatus(input: {
+    statusId: string;
+  }): Promise<MastodonStatusResult> {
     validatePlatformInput("mastodon", "unboostStatus", input);
     return mastodonRequest({
       endpoint: `/statuses/${input.statusId}/unreblog`,
@@ -163,7 +201,9 @@ export class Mastodon {
     });
   }
 
-  static async listMyStatuses(input: { limit?: number }) {
+  static async listMyStatuses(
+    input: { limit?: number }
+  ): Promise<MastodonListStatusesResult> {
     validatePlatformInput("mastodon", "listMyStatuses", input);
     const accountId = env.mastodon.accountId;
     if (!accountId) {
@@ -180,7 +220,9 @@ export class Mastodon {
     });
   }
 
-  static async getStatusContext(input: { statusId: string }) {
+  static async getStatusContext(input: {
+    statusId: string;
+  }): Promise<MastodonContextResult> {
     validatePlatformInput("mastodon", "getStatusContext", input);
     return mastodonRequest({
       endpoint: `/statuses/${input.statusId}/context`,
@@ -188,16 +230,22 @@ export class Mastodon {
     });
   }
 
-  static async getAccountAnalytics(input: { instanceScope?: "day" | "week" | "month" }) {
+  static async getAccountAnalytics(input: {
+    instanceScope?: "day" | "week" | "month";
+  }): Promise<MastodonAccountAnalyticsResult> {
     validatePlatformInput("mastodon", "getAccountAnalytics", input);
-    return mastodonRequest({
+    const raw = await mastodonRequest({
       endpoint: "/accounts/verify_credentials",
       method: "GET",
       query: { scope: input.instanceScope ?? "day" }
     });
+    return normalizeDetailResult({ platform: "mastodon", raw });
   }
 
-  static async scheduleStatus(input: { text: string; publishAt: Date | string }) {
+  static async scheduleStatus(input: {
+    text: string;
+    publishAt: Date | string;
+  }): Promise<MastodonStatusResult> {
     validatePlatformInput("mastodon", "scheduleStatus", input);
     return scheduleTask({
       id: `mastodon-schedule-${Date.now()}`,

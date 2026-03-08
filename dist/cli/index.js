@@ -155,7 +155,7 @@ async function runInitCommand(cwd) {
 }
 
 // src/cli/commands/update.ts
-import { readFile as readFile2, writeFile as writeFile3 } from "fs/promises";
+import { mkdir, readFile as readFile2, writeFile as writeFile3 } from "fs/promises";
 import path3 from "path";
 import chalk2 from "chalk";
 import inquirer2 from "inquirer";
@@ -236,6 +236,7 @@ async function crawlAllDocs() {
 
 // src/updater/ollama.ts
 import axios2 from "axios";
+import { z } from "zod";
 
 // src/config/env.ts
 import dotenv from "dotenv";
@@ -316,13 +317,33 @@ var env = {
 };
 
 // src/updater/ollama.ts
+var ollamaPatchPlanSchema = z.object({
+  summary: z.string().min(1),
+  updatedMethods: z.record(z.array(z.string())),
+  changes: z.array(
+    z.object({
+      platform: z.string().min(1),
+      endpoint: z.string().min(1),
+      changeType: z.enum(["added", "modified", "deprecated", "removed"]),
+      confidence: z.number().min(0).max(1),
+      notes: z.string().optional()
+    })
+  ).default([]),
+  files: z.array(
+    z.object({
+      path: z.string().min(1),
+      content: z.string()
+    })
+  ),
+  readmeTable: z.string()
+});
 function buildPrompt(docs, existingMethodsJson) {
   return [
     "You are maintaining universal-social-sdk.",
     "Compare the crawled docs with current methods and identify NEW or CHANGED endpoints.",
     "Focus areas: content publishing, stories, reels, comments, DMs, analytics.",
     "Output STRICT JSON with this shape only:",
-    '{"summary": string, "updatedMethods": Record<string,string[]>, "files": [{"path": string, "content": string}], "readmeTable": string}',
+    '{"summary": string, "updatedMethods": Record<string,string[]>, "changes": [{"platform": string, "endpoint": string, "changeType": "added|modified|deprecated|removed", "confidence": number, "notes"?: string}], "files": [{"path": string, "content": string}], "readmeTable": string}',
     "Files must target src/platforms/*.ts and supported-methods.json updates when needed.",
     "Each file.content must be complete TypeScript file content, not patch snippets.",
     "Current supported-methods.json:",
@@ -339,7 +360,14 @@ function parseJsonOutput(raw) {
     throw new Error("Ollama response did not contain a JSON object.");
   }
   const maybeJson = cleaned.slice(start, end + 1);
-  return JSON.parse(maybeJson);
+  const parsed = JSON.parse(maybeJson);
+  const result = ollamaPatchPlanSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new Error(
+      `Ollama patch plan schema validation failed: ${result.error.message}`
+    );
+  }
+  return result.data;
 }
 async function askOllamaForPatchPlan(params) {
   const model = params.model || env.ollama.model || "llama3.2:3b";
@@ -413,9 +441,9 @@ async function applyPlannedDiffs(params) {
 
 // src/cli/commands/update.ts
 import { spawn } from "child_process";
-function runBuild(cwd) {
+function runNpmScript(cwd, script) {
   return new Promise((resolve, reject) => {
-    const child = spawn("npm", ["run", "build"], {
+    const child = spawn("npm", ["run", script], {
       cwd,
       stdio: "inherit",
       shell: true
@@ -424,7 +452,9 @@ function runBuild(cwd) {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`Build failed with exit code ${code ?? -1}`));
+        reject(
+          new Error(`npm run ${script} failed with exit code ${code ?? -1}`)
+        );
       }
     });
   });
@@ -444,19 +474,134 @@ ${endMarker}`;
     replacement
   );
 }
+function normalizeMethods(methods) {
+  return Object.fromEntries(
+    Object.entries(methods).sort(([a], [b]) => a.localeCompare(b)).map(([platform, items]) => [platform, [...items].sort()])
+  );
+}
+function parseExistingMethods(methodsJson) {
+  try {
+    const parsed = JSON.parse(methodsJson);
+    return parsed.platforms ?? {};
+  } catch {
+    return {};
+  }
+}
+function hasMaterialChanges(params) {
+  const hasFileChanges = params.diffs.some((diff) => diff.before !== diff.after);
+  const methodsChanged = JSON.stringify(normalizeMethods(params.existingMethods)) !== JSON.stringify(normalizeMethods(params.updatedMethods));
+  return {
+    hasChanges: hasFileChanges || methodsChanged,
+    hasFileChanges,
+    methodsChanged
+  };
+}
+function inferRisk(params) {
+  const text = params.summary.toLowerCase();
+  if (text.includes("breaking") || text.includes("deprecat") || text.includes("remove")) {
+    return "high";
+  }
+  if (params.diffs.some((diff) => diff.path.startsWith("src/platforms/"))) {
+    return "medium";
+  }
+  return "low";
+}
+function buildPrArtifacts(params) {
+  const changedPlatforms = /* @__PURE__ */ new Set();
+  for (const file of params.plan.files) {
+    const parts = file.path.split("/");
+    if (parts[0] === "src" && parts[1] === "platforms" && parts[2]) {
+      changedPlatforms.add(parts[2].replace(/\.ts$/, ""));
+    }
+  }
+  const changeTypeCounts = params.plan.changes.reduce(
+    (acc, change) => {
+      acc[change.changeType] = (acc[change.changeType] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+  const branchName = `${params.branchPrefix}-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}`;
+  const title = "chore(updater): sync social API documentation changes";
+  const body = [
+    "## Summary",
+    `- ${params.plan.summary}`,
+    `- Risk classification: **${params.risk}**`,
+    `- Changed files: ${params.diffs.length}`,
+    `- Changed platforms: ${changedPlatforms.size > 0 ? [...changedPlatforms].sort().join(", ") : "none"}`,
+    `- Endpoint deltas: ${Object.keys(changeTypeCounts).length > 0 ? Object.entries(changeTypeCounts).map(([type, count]) => `${type}=${count}`).join(", ") : "none"}`,
+    "",
+    "## Validation",
+    "- [x] `npm run build`",
+    "- [x] `npm run test:unit`",
+    "",
+    "## Review checklist",
+    "- [ ] Confirm endpoint/scope changes match official docs",
+    "- [ ] Confirm method signatures are backward compatible",
+    "- [ ] Confirm normalized response contracts remain stable"
+  ].join("\n");
+  return {
+    title,
+    body,
+    base: params.base,
+    branchName,
+    changedPlatforms: [...changedPlatforms].sort()
+  };
+}
+async function writeUpdaterArtifacts(params) {
+  const outDir = path3.join(params.cwd, params.artifactsDir);
+  await mkdir(outDir, { recursive: true });
+  await writeFile3(
+    path3.join(outDir, "update-plan.json"),
+    JSON.stringify(
+      {
+        generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        docsCount: params.docsCount,
+        summary: params.plan.summary,
+        changes: params.plan.changes,
+        updatedMethods: params.plan.updatedMethods,
+        files: params.plan.files.map((file) => file.path)
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+  await writeFile3(
+    path3.join(outDir, "update-diff-summary.json"),
+    JSON.stringify(
+      {
+        generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        hasChanges: params.hasChanges,
+        risk: params.risk,
+        changes: params.plan.changes,
+        changedFiles: params.diffs.filter((diff) => diff.before !== diff.after).map((diff) => diff.path),
+        pr: params.pr
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+  await writeFile3(path3.join(outDir, "pr-title.txt"), `${params.pr.title}
+`, "utf8");
+  await writeFile3(path3.join(outDir, "pr-body.md"), `${params.pr.body}
+`, "utf8");
+}
 async function runUpdateCommand(cwd, options = {}) {
   const crawlSpinner = ora2("Crawling official social API docs...").start();
   const docs = await crawlAllDocs();
   crawlSpinner.succeed(`Crawled ${docs.length} documentation pages.`);
   const methodsPath = path3.join(cwd, "supported-methods.json");
   const methodsJson = await readFile2(methodsPath, "utf8");
-  const aiSpinner = ora2("Asking local Ollama model for SDK update plan...").start();
+  const existingMethods = parseExistingMethods(methodsJson);
+  const planSpinner = ora2("Generating SDK update plan from crawled docs...").start();
   const plan = await askOllamaForPatchPlan({
     docs,
     existingMethodsJson: methodsJson,
     model: options.model
   });
-  aiSpinner.succeed("Ollama returned an update plan.");
+  planSpinner.succeed("Update plan generated.");
   const generatedFiles = [...plan.files];
   const readmePath = path3.join(cwd, "README.md");
   const readmeContent = await readFile2(readmePath, "utf8");
@@ -471,6 +616,20 @@ async function runUpdateCommand(cwd, options = {}) {
     rootDir: cwd,
     files: generatedFiles
   });
+  const changeStats = hasMaterialChanges({
+    diffs,
+    existingMethods,
+    updatedMethods: plan.updatedMethods
+  });
+  const hasChanges = changeStats.hasChanges;
+  const risk = inferRisk({ summary: plan.summary, diffs });
+  const prArtifacts = buildPrArtifacts({
+    plan,
+    diffs,
+    risk,
+    base: options.base ?? "main",
+    branchPrefix: options.branchPrefix ?? "chore/updater"
+  });
   console.log(chalk2.bold("\nProposed changes"));
   console.log(chalk2.dim(plan.summary));
   for (const planned of diffs) {
@@ -481,7 +640,24 @@ async function runUpdateCommand(cwd, options = {}) {
       console.log(chalk2.dim("... diff truncated in terminal preview ..."));
     }
   }
-  const applyChanges = options.yes ? true : (await inquirer2.prompt([
+  if (options.openPr || options.ci) {
+    await writeUpdaterArtifacts({
+      cwd,
+      artifactsDir: options.artifactsDir ?? ".artifacts",
+      docsCount: docs.length,
+      plan,
+      diffs,
+      hasChanges,
+      risk,
+      pr: prArtifacts
+    });
+  }
+  if (!hasChanges) {
+    console.log(chalk2.green("No material documentation changes detected."));
+    return;
+  }
+  const nonInteractive = options.ci || options.openPr;
+  const applyChanges = options.yes ? true : nonInteractive ? true : (await inquirer2.prompt([
     {
       type: "confirm",
       name: "applyChanges",
@@ -513,13 +689,18 @@ async function runUpdateCommand(cwd, options = {}) {
   );
   applySpinner.succeed("Patch files applied.");
   const buildSpinner = ora2("Rebuilding package...").start();
-  await runBuild(cwd);
+  await runNpmScript(cwd, "build");
   buildSpinner.succeed("Package rebuilt successfully.");
+  if (options.ci || options.openPr) {
+    const testSpinner = ora2("Running unit tests...").start();
+    await runNpmScript(cwd, "test:unit");
+    testSpinner.succeed("Unit tests passed.");
+  }
 }
 
 // src/cli/index.ts
 var program = new Command();
-program.name("universal-social-sdk").description("Universal social media SDK CLI").version("1.0.0");
+program.name("universal-social-sdk").description("Universal social media SDK CLI").version("1.1.0");
 program.command("init").description("Create .env.example and show OAuth setup links").action(async () => {
   try {
     await runInitCommand(process.cwd());
@@ -529,18 +710,33 @@ program.command("init").description("Create .env.example and show OAuth setup li
     process.exitCode = 1;
   }
 });
-program.command("update").description("Crawl docs + run local Ollama + patch SDK sources").option("--dry-run", "Preview changes without writing files").option("-y, --yes", "Apply changes without confirmation prompt").option("--model <name>", "Override Ollama model for this run").action(async (options) => {
-  try {
-    await runUpdateCommand(process.cwd(), {
-      dryRun: options.dryRun,
-      yes: options.yes,
-      model: options.model
-    });
-  } catch (error) {
-    console.error(chalk3.red("Update failed."));
-    console.error(error);
-    process.exitCode = 1;
+program.command("update").description("Crawl docs + run local Ollama + patch SDK sources").option("--dry-run", "Preview changes without writing files").option("-y, --yes", "Apply changes without confirmation prompt").option("--model <name>", "Override Ollama model for this run").option("--ci", "Run in non-interactive CI mode").option("--open-pr", "Prepare PR artifacts for workflow automation").option(
+  "--branch-prefix <prefix>",
+  "Branch prefix for updater PR metadata",
+  "chore/updater"
+).option("--base <branch>", "Base branch for PR metadata", "main").option(
+  "--artifacts-dir <path>",
+  "Directory for generated updater artifacts",
+  ".artifacts"
+).action(
+  async (options) => {
+    try {
+      await runUpdateCommand(process.cwd(), {
+        dryRun: options.dryRun,
+        yes: options.yes,
+        model: options.model,
+        ci: options.ci,
+        openPr: options.openPr,
+        branchPrefix: options.branchPrefix,
+        base: options.base,
+        artifactsDir: options.artifactsDir
+      });
+    } catch (error) {
+      console.error(chalk3.red("Update failed."));
+      console.error(error);
+      process.exitCode = 1;
+    }
   }
-});
+);
 program.parse(process.argv);
 //# sourceMappingURL=index.js.map

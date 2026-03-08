@@ -1,9 +1,18 @@
 import axios from "axios";
 import { env } from "../config/env.js";
 import { SocialError } from "../errors/SocialError.js";
+import { normalizeActionResult } from "../utils/normalizedResult.js";
 import { withRetries } from "../utils/retry.js";
 import { scheduleTask } from "../utils/scheduler.js";
 import { validatePlatformInput } from "../validation/platformSchemas.js";
+import type {
+  BlueskyDeleteResult,
+  BlueskyFeedResult,
+  BlueskyNotificationsResult,
+  BlueskyRecordResult,
+  BlueskySearchResult,
+  BlueskyThreadResult
+} from "../responseTypes.js";
 
 const DEFAULT_SERVICE = "https://bsky.social";
 
@@ -70,9 +79,12 @@ async function bskyRequest<T = unknown>(params: {
   });
 }
 
-async function createRecord(collection: string, record: Record<string, unknown>) {
+async function createRecord(
+  collection: string,
+  record: Record<string, unknown>
+): Promise<BlueskyRecordResult> {
   const session = await ensureSession();
-  return bskyRequest({
+  return bskyRequest<BlueskyRecordResult>({
     endpoint: "/com.atproto.repo.createRecord",
     method: "POST",
     data: {
@@ -84,7 +96,7 @@ async function createRecord(collection: string, record: Record<string, unknown>)
 }
 
 export class Bluesky {
-  static async postText(input: { text: string }) {
+  static async postText(input: { text: string }): Promise<BlueskyRecordResult> {
     validatePlatformInput("bluesky", "postText", input);
     return createRecord("app.bsky.feed.post", {
       $type: "app.bsky.feed.post",
@@ -93,7 +105,10 @@ export class Bluesky {
     });
   }
 
-  static async postWithLink(input: { text: string; url: string }) {
+  static async postWithLink(input: {
+    text: string;
+    url: string;
+  }): Promise<BlueskyRecordResult> {
     validatePlatformInput("bluesky", "postWithLink", input);
     return createRecord("app.bsky.feed.post", {
       $type: "app.bsky.feed.post",
@@ -108,7 +123,7 @@ export class Bluesky {
     rootCid: string;
     parentUri: string;
     parentCid: string;
-  }) {
+  }): Promise<BlueskyRecordResult> {
     validatePlatformInput("bluesky", "replyToPost", input);
     return createRecord("app.bsky.feed.post", {
       $type: "app.bsky.feed.post",
@@ -121,7 +136,10 @@ export class Bluesky {
     });
   }
 
-  static async likePost(input: { subjectUri: string; subjectCid: string }) {
+  static async likePost(input: {
+    subjectUri: string;
+    subjectCid: string;
+  }): Promise<BlueskyRecordResult> {
     validatePlatformInput("bluesky", "likePost", input);
     return createRecord("app.bsky.feed.like", {
       $type: "app.bsky.feed.like",
@@ -130,7 +148,10 @@ export class Bluesky {
     });
   }
 
-  static async repost(input: { subjectUri: string; subjectCid: string }) {
+  static async repost(input: {
+    subjectUri: string;
+    subjectCid: string;
+  }): Promise<BlueskyRecordResult> {
     validatePlatformInput("bluesky", "repost", input);
     return createRecord("app.bsky.feed.repost", {
       $type: "app.bsky.feed.repost",
@@ -139,13 +160,15 @@ export class Bluesky {
     });
   }
 
-  static async deleteRecord(input: { uri: string }) {
+  static async deleteRecord(
+    input: { uri: string }
+  ): Promise<BlueskyDeleteResult> {
     validatePlatformInput("bluesky", "deleteRecord", input);
     const session = await ensureSession();
     const parsed = new URL(input.uri.replace("at://", "https://"));
     const parts = parsed.pathname.split("/").filter(Boolean);
     const [collection, rkey] = parts.slice(-2);
-    return bskyRequest({
+    const raw = await bskyRequest({
       endpoint: "/com.atproto.repo.deleteRecord",
       method: "POST",
       data: {
@@ -154,11 +177,15 @@ export class Bluesky {
         rkey
       }
     });
+    return normalizeActionResult({ platform: "bluesky", action: "deleteRecord", raw });
   }
 
-  static async getAuthorFeed(input: { actorDidOrHandle: string; limit?: number }) {
+  static async getAuthorFeed(input: {
+    actorDidOrHandle: string;
+    limit?: number;
+  }): Promise<BlueskyFeedResult> {
     validatePlatformInput("bluesky", "getAuthorFeed", input);
-    return bskyRequest({
+    return bskyRequest<BlueskyFeedResult>({
       endpoint: "/app.bsky.feed.getAuthorFeed",
       method: "GET",
       query: {
@@ -168,34 +195,45 @@ export class Bluesky {
     });
   }
 
-  static async searchPosts(input: { query: string; limit?: number }) {
+  static async searchPosts(input: {
+    query: string;
+    limit?: number;
+  }): Promise<BlueskySearchResult> {
     validatePlatformInput("bluesky", "searchPosts", input);
-    return bskyRequest({
+    return bskyRequest<BlueskySearchResult>({
       endpoint: "/app.bsky.feed.searchPosts",
       method: "GET",
       query: { q: input.query, limit: input.limit ?? 25 }
     });
   }
 
-  static async getPostThread(input: { uri: string; depth?: number }) {
+  static async getPostThread(input: {
+    uri: string;
+    depth?: number;
+  }): Promise<BlueskyThreadResult> {
     validatePlatformInput("bluesky", "getPostThread", input);
-    return bskyRequest({
+    return bskyRequest<BlueskyThreadResult>({
       endpoint: "/app.bsky.feed.getPostThread",
       method: "GET",
       query: { uri: input.uri, depth: input.depth ?? 6 }
     });
   }
 
-  static async getNotificationFeed(input: { limit?: number }) {
+  static async getNotificationFeed(input: {
+    limit?: number;
+  }): Promise<BlueskyNotificationsResult> {
     validatePlatformInput("bluesky", "getNotificationFeed", input);
-    return bskyRequest({
+    return bskyRequest<BlueskyNotificationsResult>({
       endpoint: "/app.bsky.notification.listNotifications",
       method: "GET",
       query: { limit: input.limit ?? 25 }
     });
   }
 
-  static async schedulePost(input: { text: string; publishAt: Date | string }) {
+  static async schedulePost(input: {
+    text: string;
+    publishAt: Date | string;
+  }): Promise<BlueskyRecordResult> {
     validatePlatformInput("bluesky", "schedulePost", input);
     return scheduleTask({
       id: `bluesky-schedule-${Date.now()}`,
