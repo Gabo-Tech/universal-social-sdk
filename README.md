@@ -12,6 +12,7 @@ TypeScript-first, ESM-only, zero-bloat Node.js SDK that provides one unified int
 - [Contributing](./docs/CONTRIBUTING.md)
 - [Code of Conduct](./CODE_OF_CONDUCT.md)
 - [Security Policy](./SECURITY.md)
+- [Changelog](./CHANGELOG.md)
 
 ## Install
 
@@ -45,6 +46,22 @@ await Bluesky.postText({ text: "Hello AT Protocol!" });
 await Mastodon.createStatus({ text: "Hello Fediverse!" });
 await Threads.postText({ text: "Hello Threads!" });
 ```
+
+## Examples
+
+Run bundled examples:
+
+```bash
+npm run example:x
+npm run example:instagram
+npm run example:bluesky
+```
+
+Files:
+
+- `examples/x-post.mjs`
+- `examples/instagram-reel.mjs`
+- `examples/bluesky-post.mjs`
 
 ## Required Environment Variables
 

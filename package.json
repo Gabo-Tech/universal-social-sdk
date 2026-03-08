@@ -1,6 +1,6 @@
 {
   "name": "universal-social-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "TypeScript-first universal social media SDK for Node.js",
   "type": "module",
   "license": "MIT",
@@ -8,6 +8,14 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Gabo-Tech/universal-social-sdk.git"
+  },
+  "homepage": "https://github.com/Gabo-Tech/universal-social-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/Gabo-Tech/universal-social-sdk/issues"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/Gabo-Tech"
   },
   "keywords": [
     "sdk",
@@ -35,7 +43,10 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     ".env.example",
+    ".env.test.example",
+    "examples",
     "supported-methods.json"
   ],
   "bin": {
@@ -49,6 +60,9 @@
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "example:x": "node examples/x-post.mjs",
+    "example:instagram": "node examples/instagram-reel.mjs",
+    "example:bluesky": "node examples/bluesky-post.mjs",
     "test:watch": "vitest",
     "prepare": "npm run build"
   },
