@@ -36,7 +36,6 @@ jobs:
     name: Integration Tests (secret-gated)
     runs-on: ubuntu-latest
     needs: unit
-    if: ${{ secrets.X_API_KEY != '' && secrets.X_API_SECRET != '' && secrets.X_ACCESS_TOKEN != '' && secrets.X_ACCESS_SECRET != '' && secrets.X_TEST_TWEET_ID != '' && secrets.FB_PAGE_ACCESS_TOKEN != '' && secrets.FB_PAGE_ID != '' && secrets.IG_ACCESS_TOKEN != '' && secrets.IG_USER_ID != '' && secrets.LINKEDIN_ACCESS_TOKEN != '' && secrets.LINKEDIN_ORG_URN != '' }}
     env:
       X_API_KEY: ${{ secrets.X_API_KEY }}
       X_API_SECRET: ${{ secrets.X_API_SECRET }}
@@ -50,17 +49,44 @@ jobs:
       LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
       LINKEDIN_ORG_URN: ${{ secrets.LINKEDIN_ORG_URN }}
     steps:
+      - name: Check integration secret availability
+        id: gate
+        run: |
+          missing=()
+          for key in \
+            X_API_KEY X_API_SECRET X_ACCESS_TOKEN X_ACCESS_SECRET X_TEST_TWEET_ID \
+            FB_PAGE_ACCESS_TOKEN FB_PAGE_ID \
+            IG_ACCESS_TOKEN IG_USER_ID \
+            LINKEDIN_ACCESS_TOKEN LINKEDIN_ORG_URN
+          do
+            if [ -z "${!key}" ]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "can_run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping integration tests. Missing secrets: ${missing[*]}"
+          else
+            echo "can_run=true" >> "$GITHUB_OUTPUT"
+            echo "All required integration secrets are present."
+          fi
+
       - name: Checkout
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
         run: npm ci
 
       - name: Run integration tests
+        if: ${{ steps.gate.outputs.can_run == 'true' }}
         run: npm run test:integration

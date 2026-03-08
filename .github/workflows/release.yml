@@ -20,12 +20,45 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
-    if: ${{ secrets.NPM_TOKEN != '' && (github.event_name == 'push' || github.event.inputs.publish == 'true') }}
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      EVENT_NAME: ${{ github.event_name }}
+      INPUT_PUBLISH: ${{ github.event.inputs.publish }}
     steps:
+      - name: Check publish eligibility
+        id: gate
+        run: |
+          should_publish=false
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            should_publish=true
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_PUBLISH" = "true" ]; then
+            should_publish=true
+          fi
+
+          if [ "$should_publish" != "true" ]; then
+            echo "can_publish=false" >> "$GITHUB_OUTPUT"
+            echo "Manual run requested without publish=true. Skipping."
+            exit 0
+          fi
+
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "can_publish=false" >> "$GITHUB_OUTPUT"
+            echo "NPM_TOKEN is missing. Skipping publish."
+            exit 0
+          fi
+
+          echo "can_publish=true" >> "$GITHUB_OUTPUT"
+          echo "Publish conditions satisfied."
+
       - name: Checkout
+        if: ${{ steps.gate.outputs.can_publish == 'true' }}
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: ${{ steps.gate.outputs.can_publish == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -33,15 +66,19 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
+        if: ${{ steps.gate.outputs.can_publish == 'true' }}
         run: npm ci
 
       - name: Build package
+        if: ${{ steps.gate.outputs.can_publish == 'true' }}
         run: npm run build
 
       - name: Run unit tests
+        if: ${{ steps.gate.outputs.can_publish == 'true' }}
         run: npm run test:unit
 
       - name: Publish to npm
+        if: ${{ steps.gate.outputs.can_publish == 'true' }}
         run: npm publish --access public --provenance
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
