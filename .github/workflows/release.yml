@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches:
+      - "main"
     tags:
       - "v*"
   workflow_dispatch:
@@ -24,13 +26,14 @@ jobs:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       EVENT_NAME: ${{ github.event_name }}
       INPUT_PUBLISH: ${{ github.event.inputs.publish }}
+      GITHUB_REF: ${{ github.ref }}
     steps:
       - name: Check publish eligibility
         id: gate
         run: |
           should_publish=false
 
-          if [ "$EVENT_NAME" = "push" ]; then
+          if [ "$EVENT_NAME" = "push" ] && [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             should_publish=true
           fi
 
