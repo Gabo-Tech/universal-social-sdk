@@ -144,6 +144,220 @@ const schemaMap = {
     }),
     uploadBinary: z.object({ uploadUrl: nonEmpty, mediaPath: nonEmpty }),
     deletePost: z.object({ encodedPostUrn: nonEmpty })
+  },
+  youtube: {
+    createVideoUploadSession: z.object({
+      title: nonEmpty,
+      description: optionalNonEmpty,
+      privacyStatus: z.enum(["private", "public", "unlisted"]).optional()
+    }),
+    uploadBinary: z.object({ uploadUrl: nonEmpty, mediaPath: nonEmpty }),
+    listMyVideos: z.object({ maxResults: z.number().int().positive().optional() }),
+    updateVideoMetadata: z.object({
+      videoId: nonEmpty,
+      title: optionalNonEmpty,
+      description: optionalNonEmpty,
+      privacyStatus: z.enum(["private", "public", "unlisted"]).optional()
+    }),
+    deleteVideo: z.object({ videoId: nonEmpty }),
+    commentOnVideo: z.object({ videoId: nonEmpty, text: nonEmpty }),
+    replyToComment: z.object({ parentCommentId: nonEmpty, text: nonEmpty }),
+    likeVideo: z.object({ videoId: nonEmpty }),
+    unlikeVideo: z.object({ videoId: nonEmpty }),
+    createPlaylist: z.object({
+      title: nonEmpty,
+      description: optionalNonEmpty,
+      privacyStatus: z.enum(["private", "public", "unlisted"]).optional()
+    }),
+    addVideoToPlaylist: z.object({ playlistId: nonEmpty, videoId: nonEmpty }),
+    getChannelAnalytics: z.object({
+      startDate: nonEmpty,
+      endDate: nonEmpty,
+      metrics: optionalNonEmpty
+    }),
+    scheduleVideoMetadataUpdate: z.object({
+      videoId: nonEmpty,
+      title: optionalNonEmpty,
+      description: optionalNonEmpty,
+      privacyStatus: z.enum(["private", "public", "unlisted"]).optional(),
+      publishAt: dateLike
+    })
+  },
+  tiktok: {
+    createPost: z.object({
+      text: nonEmpty,
+      visibility: z
+        .enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"])
+        .optional()
+    }),
+    createVideoPost: z.object({
+      title: nonEmpty,
+      videoUrl: nonEmpty,
+      visibility: z
+        .enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"])
+        .optional()
+    }),
+    getPostStatus: z.object({ publishId: nonEmpty }),
+    listVideos: z.object({ maxCount: z.number().int().positive().optional() }),
+    deleteVideo: z.object({ videoId: nonEmpty }),
+    commentOnVideo: z.object({ videoId: nonEmpty, text: nonEmpty }),
+    replyToComment: z.object({ commentId: nonEmpty, text: nonEmpty }),
+    likeVideo: z.object({ videoId: nonEmpty }),
+    unlikeVideo: z.object({ videoId: nonEmpty }),
+    getVideoAnalytics: z.object({ videoIds: z.array(nonEmpty).min(1) }),
+    getProfileAnalytics: z.object({ fields: z.array(nonEmpty).optional() }),
+    scheduleVideoPost: z.object({
+      title: nonEmpty,
+      videoUrl: nonEmpty,
+      publishAt: dateLike
+    })
+  },
+  pinterest: {
+    createPin: z.object({
+      boardId: optionalNonEmpty,
+      title: nonEmpty,
+      description: optionalNonEmpty,
+      link: optionalNonEmpty,
+      mediaSourceUrl: nonEmpty
+    }),
+    createVideoPin: z.object({
+      boardId: optionalNonEmpty,
+      title: nonEmpty,
+      description: optionalNonEmpty,
+      mediaSourceUrl: nonEmpty
+    }),
+    updatePin: z.object({
+      pinId: nonEmpty,
+      title: optionalNonEmpty,
+      description: optionalNonEmpty,
+      link: optionalNonEmpty
+    }),
+    deletePin: z.object({ pinId: nonEmpty }),
+    listPins: z.object({
+      boardId: optionalNonEmpty,
+      pageSize: z.number().int().positive().optional()
+    }),
+    createBoard: z.object({
+      name: nonEmpty,
+      description: optionalNonEmpty,
+      privacy: z.enum(["PUBLIC", "PROTECTED", "SECRET"]).optional()
+    }),
+    listBoards: z.object({ pageSize: z.number().int().positive().optional() }),
+    commentOnPin: z.object({ pinId: nonEmpty, text: nonEmpty }),
+    replyToComment: z.object({
+      pinId: nonEmpty,
+      commentId: nonEmpty,
+      text: nonEmpty
+    }),
+    getPinAnalytics: z.object({
+      pinId: nonEmpty,
+      startDate: nonEmpty,
+      endDate: nonEmpty
+    }),
+    getAccountAnalytics: z.object({ startDate: nonEmpty, endDate: nonEmpty }),
+    schedulePin: z.object({
+      title: nonEmpty,
+      mediaSourceUrl: nonEmpty,
+      boardId: optionalNonEmpty,
+      publishAt: dateLike
+    })
+  },
+  bluesky: {
+    postText: z.object({ text: nonEmpty }),
+    postWithLink: z.object({ text: nonEmpty, url: nonEmpty }),
+    replyToPost: z.object({
+      text: nonEmpty,
+      rootUri: nonEmpty,
+      rootCid: nonEmpty,
+      parentUri: nonEmpty,
+      parentCid: nonEmpty
+    }),
+    likePost: z.object({ subjectUri: nonEmpty, subjectCid: nonEmpty }),
+    repost: z.object({ subjectUri: nonEmpty, subjectCid: nonEmpty }),
+    deleteRecord: z.object({ uri: nonEmpty }),
+    getAuthorFeed: z.object({
+      actorDidOrHandle: nonEmpty,
+      limit: z.number().int().positive().optional()
+    }),
+    searchPosts: z.object({
+      query: nonEmpty,
+      limit: z.number().int().positive().optional()
+    }),
+    getPostThread: z.object({
+      uri: nonEmpty,
+      depth: z.number().int().positive().optional()
+    }),
+    getNotificationFeed: z.object({
+      limit: z.number().int().positive().optional()
+    }),
+    schedulePost: z.object({ text: nonEmpty, publishAt: dateLike })
+  },
+  mastodon: {
+    createStatus: z.object({
+      text: nonEmpty,
+      visibility: z.enum(["public", "unlisted", "private", "direct"]).optional()
+    }),
+    uploadMedia: z.object({ mediaPath: nonEmpty, description: optionalNonEmpty }),
+    createMediaStatus: z.object({
+      text: nonEmpty,
+      mediaIds: z.array(nonEmpty).min(1),
+      visibility: z.enum(["public", "unlisted", "private", "direct"]).optional()
+    }),
+    replyToStatus: z.object({ statusId: nonEmpty, text: nonEmpty }),
+    deleteStatus: z.object({ statusId: nonEmpty }),
+    favouriteStatus: z.object({ statusId: nonEmpty }),
+    unfavouriteStatus: z.object({ statusId: nonEmpty }),
+    boostStatus: z.object({ statusId: nonEmpty }),
+    unboostStatus: z.object({ statusId: nonEmpty }),
+    listMyStatuses: z.object({ limit: z.number().int().positive().optional() }),
+    getStatusContext: z.object({ statusId: nonEmpty }),
+    getAccountAnalytics: z.object({
+      instanceScope: z.enum(["day", "week", "month"]).optional()
+    }),
+    scheduleStatus: z.object({ text: nonEmpty, publishAt: dateLike })
+  },
+  threads: {
+    postText: z.object({ threadsUserId: optionalNonEmpty, text: nonEmpty }),
+    postImage: z.object({
+      threadsUserId: optionalNonEmpty,
+      text: optionalNonEmpty,
+      imageUrl: nonEmpty
+    }),
+    postVideo: z.object({
+      threadsUserId: optionalNonEmpty,
+      text: optionalNonEmpty,
+      videoUrl: nonEmpty
+    }),
+    replyToThread: z.object({
+      threadsUserId: optionalNonEmpty,
+      threadId: nonEmpty,
+      text: nonEmpty
+    }),
+    deleteThread: z.object({ threadId: nonEmpty }),
+    getThread: z.object({
+      threadId: nonEmpty,
+      fields: z.array(nonEmpty).optional()
+    }),
+    listMyThreads: z.object({
+      threadsUserId: optionalNonEmpty,
+      limit: z.number().int().positive().optional()
+    }),
+    getThreadInsights: z.object({
+      threadId: nonEmpty,
+      metrics: z.array(nonEmpty).optional()
+    }),
+    getAccountInsights: z.object({
+      threadsUserId: optionalNonEmpty,
+      metrics: z.array(nonEmpty).optional(),
+      period: z.enum(["day", "week", "days_28"]).optional()
+    }),
+    likeThread: z.object({ threadId: nonEmpty }),
+    unlikeThread: z.object({ threadId: nonEmpty }),
+    scheduleTextPost: z.object({
+      threadsUserId: optionalNonEmpty,
+      text: nonEmpty,
+      publishAt: dateLike
+    })
   }
 } as const;
 

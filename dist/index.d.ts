@@ -293,7 +293,321 @@ declare class LinkedIn {
     }): Promise<unknown>;
 }
 
-type Platform = "x" | "facebook" | "instagram" | "linkedin";
+declare class YouTube {
+    static createVideoUploadSession(input: {
+        title: string;
+        description?: string;
+        privacyStatus?: "private" | "public" | "unlisted";
+    }): Promise<unknown>;
+    static uploadBinary(input: {
+        uploadUrl: string;
+        mediaPath: string;
+    }): Promise<axios.AxiosResponse<any, any, {}>>;
+    static listMyVideos(input: {
+        maxResults?: number;
+    }): Promise<unknown>;
+    static updateVideoMetadata(input: {
+        videoId: string;
+        title?: string;
+        description?: string;
+        privacyStatus?: "private" | "public" | "unlisted";
+    }): Promise<unknown>;
+    static deleteVideo(input: {
+        videoId: string;
+    }): Promise<unknown>;
+    static commentOnVideo(input: {
+        videoId: string;
+        text: string;
+    }): Promise<unknown>;
+    static replyToComment(input: {
+        parentCommentId: string;
+        text: string;
+    }): Promise<unknown>;
+    static likeVideo(input: {
+        videoId: string;
+    }): Promise<unknown>;
+    static unlikeVideo(input: {
+        videoId: string;
+    }): Promise<unknown>;
+    static createPlaylist(input: {
+        title: string;
+        description?: string;
+        privacyStatus?: "private" | "public" | "unlisted";
+    }): Promise<unknown>;
+    static addVideoToPlaylist(input: {
+        playlistId: string;
+        videoId: string;
+    }): Promise<unknown>;
+    static getChannelAnalytics(input: {
+        startDate: string;
+        endDate: string;
+        metrics?: string;
+    }): Promise<any>;
+    static scheduleVideoMetadataUpdate(input: {
+        videoId: string;
+        title?: string;
+        description?: string;
+        privacyStatus?: "private" | "public" | "unlisted";
+        publishAt: Date | string;
+    }): Promise<unknown>;
+}
+
+declare class TikTok {
+    static createPost(input: {
+        text: string;
+        visibility?: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "SELF_ONLY";
+    }): Promise<unknown>;
+    static createVideoPost(input: {
+        title: string;
+        videoUrl: string;
+        visibility?: "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "SELF_ONLY";
+    }): Promise<unknown>;
+    static getPostStatus(input: {
+        publishId: string;
+    }): Promise<unknown>;
+    static listVideos(input: {
+        maxCount?: number;
+    }): Promise<unknown>;
+    static deleteVideo(input: {
+        videoId: string;
+    }): Promise<unknown>;
+    static commentOnVideo(input: {
+        videoId: string;
+        text: string;
+    }): Promise<unknown>;
+    static replyToComment(input: {
+        commentId: string;
+        text: string;
+    }): Promise<unknown>;
+    static likeVideo(input: {
+        videoId: string;
+    }): Promise<unknown>;
+    static unlikeVideo(input: {
+        videoId: string;
+    }): Promise<unknown>;
+    static getVideoAnalytics(input: {
+        videoIds: string[];
+    }): Promise<unknown>;
+    static getProfileAnalytics(input: {
+        fields?: string[];
+    }): Promise<unknown>;
+    static scheduleVideoPost(input: {
+        title: string;
+        videoUrl: string;
+        publishAt: Date | string;
+    }): Promise<unknown>;
+}
+
+declare class Pinterest {
+    static createPin(input: {
+        boardId?: string;
+        title: string;
+        description?: string;
+        link?: string;
+        mediaSourceUrl: string;
+    }): Promise<unknown>;
+    static createVideoPin(input: {
+        boardId?: string;
+        title: string;
+        description?: string;
+        mediaSourceUrl: string;
+    }): Promise<unknown>;
+    static updatePin(input: {
+        pinId: string;
+        title?: string;
+        description?: string;
+        link?: string;
+    }): Promise<unknown>;
+    static deletePin(input: {
+        pinId: string;
+    }): Promise<unknown>;
+    static listPins(input: {
+        boardId?: string;
+        pageSize?: number;
+    }): Promise<unknown>;
+    static createBoard(input: {
+        name: string;
+        description?: string;
+        privacy?: "PUBLIC" | "PROTECTED" | "SECRET";
+    }): Promise<unknown>;
+    static listBoards(input: {
+        pageSize?: number;
+    }): Promise<unknown>;
+    static commentOnPin(input: {
+        pinId: string;
+        text: string;
+    }): Promise<unknown>;
+    static replyToComment(input: {
+        pinId: string;
+        commentId: string;
+        text: string;
+    }): Promise<unknown>;
+    static getPinAnalytics(input: {
+        pinId: string;
+        startDate: string;
+        endDate: string;
+    }): Promise<unknown>;
+    static getAccountAnalytics(input: {
+        startDate: string;
+        endDate: string;
+    }): Promise<unknown>;
+    static schedulePin(input: {
+        title: string;
+        mediaSourceUrl: string;
+        boardId?: string;
+        publishAt: Date | string;
+    }): Promise<unknown>;
+}
+
+declare class Bluesky {
+    static postText(input: {
+        text: string;
+    }): Promise<unknown>;
+    static postWithLink(input: {
+        text: string;
+        url: string;
+    }): Promise<unknown>;
+    static replyToPost(input: {
+        text: string;
+        rootUri: string;
+        rootCid: string;
+        parentUri: string;
+        parentCid: string;
+    }): Promise<unknown>;
+    static likePost(input: {
+        subjectUri: string;
+        subjectCid: string;
+    }): Promise<unknown>;
+    static repost(input: {
+        subjectUri: string;
+        subjectCid: string;
+    }): Promise<unknown>;
+    static deleteRecord(input: {
+        uri: string;
+    }): Promise<unknown>;
+    static getAuthorFeed(input: {
+        actorDidOrHandle: string;
+        limit?: number;
+    }): Promise<unknown>;
+    static searchPosts(input: {
+        query: string;
+        limit?: number;
+    }): Promise<unknown>;
+    static getPostThread(input: {
+        uri: string;
+        depth?: number;
+    }): Promise<unknown>;
+    static getNotificationFeed(input: {
+        limit?: number;
+    }): Promise<unknown>;
+    static schedulePost(input: {
+        text: string;
+        publishAt: Date | string;
+    }): Promise<unknown>;
+}
+
+declare class Mastodon {
+    static createStatus(input: {
+        text: string;
+        visibility?: "public" | "unlisted" | "private" | "direct";
+    }): Promise<unknown>;
+    static uploadMedia(input: {
+        mediaPath: string;
+        description?: string;
+    }): Promise<axios.AxiosResponse<any, any, {}>>;
+    static createMediaStatus(input: {
+        text: string;
+        mediaIds: string[];
+        visibility?: "public" | "unlisted" | "private" | "direct";
+    }): Promise<unknown>;
+    static replyToStatus(input: {
+        statusId: string;
+        text: string;
+    }): Promise<unknown>;
+    static deleteStatus(input: {
+        statusId: string;
+    }): Promise<unknown>;
+    static favouriteStatus(input: {
+        statusId: string;
+    }): Promise<unknown>;
+    static unfavouriteStatus(input: {
+        statusId: string;
+    }): Promise<unknown>;
+    static boostStatus(input: {
+        statusId: string;
+    }): Promise<unknown>;
+    static unboostStatus(input: {
+        statusId: string;
+    }): Promise<unknown>;
+    static listMyStatuses(input: {
+        limit?: number;
+    }): Promise<unknown>;
+    static getStatusContext(input: {
+        statusId: string;
+    }): Promise<unknown>;
+    static getAccountAnalytics(input: {
+        instanceScope?: "day" | "week" | "month";
+    }): Promise<unknown>;
+    static scheduleStatus(input: {
+        text: string;
+        publishAt: Date | string;
+    }): Promise<unknown>;
+}
+
+declare class Threads {
+    static postText(input: {
+        threadsUserId?: string;
+        text: string;
+    }): Promise<unknown>;
+    static postImage(input: {
+        threadsUserId?: string;
+        text?: string;
+        imageUrl: string;
+    }): Promise<unknown>;
+    static postVideo(input: {
+        threadsUserId?: string;
+        text?: string;
+        videoUrl: string;
+    }): Promise<unknown>;
+    static replyToThread(input: {
+        threadsUserId?: string;
+        threadId: string;
+        text: string;
+    }): Promise<unknown>;
+    static deleteThread(input: {
+        threadId: string;
+    }): Promise<unknown>;
+    static getThread(input: {
+        threadId: string;
+        fields?: string[];
+    }): Promise<unknown>;
+    static listMyThreads(input: {
+        threadsUserId?: string;
+        limit?: number;
+    }): Promise<unknown>;
+    static getThreadInsights(input: {
+        threadId: string;
+        metrics?: string[];
+    }): Promise<unknown>;
+    static getAccountInsights(input: {
+        threadsUserId?: string;
+        metrics?: string[];
+        period?: "day" | "week" | "days_28";
+    }): Promise<unknown>;
+    static likeThread(input: {
+        threadId: string;
+    }): Promise<unknown>;
+    static unlikeThread(input: {
+        threadId: string;
+    }): Promise<unknown>;
+    static scheduleTextPost(input: {
+        threadsUserId?: string;
+        text: string;
+        publishAt: Date | string;
+    }): Promise<unknown>;
+}
+
+type Platform = "x" | "facebook" | "instagram" | "linkedin" | "youtube" | "tiktok" | "pinterest" | "bluesky" | "mastodon" | "threads";
 interface BaseResult<T = unknown> {
     ok: boolean;
     platform: Platform;
@@ -347,4 +661,4 @@ declare class SocialError extends Error {
     }): SocialError;
 }
 
-export { type AnalyticsRange, type BaseResult, Facebook, Instagram, LinkedIn, type MediaUploadOptions, type Platform, type RetryOptions, type ScheduleOptions, SocialError, X };
+export { type AnalyticsRange, type BaseResult, Bluesky, Facebook, Instagram, LinkedIn, Mastodon, type MediaUploadOptions, Pinterest, type Platform, type RetryOptions, type ScheduleOptions, SocialError, Threads, TikTok, X, YouTube };

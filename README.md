@@ -1,6 +1,6 @@
 # universal-social-sdk
 
-TypeScript-first, ESM-only, zero-bloat Node.js SDK that provides one unified interface for X, Facebook Pages, Instagram Graph, and LinkedIn.
+TypeScript-first, ESM-only, zero-bloat Node.js SDK that provides one unified interface for X, Facebook, Instagram, LinkedIn, YouTube, TikTok, Pinterest, Bluesky, Mastodon, and Threads.
 
 [![CI](https://github.com/Gabo-Tech/universal-social-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Gabo-Tech/universal-social-sdk/actions/workflows/ci.yml)
 [![Release](https://github.com/Gabo-Tech/universal-social-sdk/actions/workflows/release.yml/badge.svg)](https://github.com/Gabo-Tech/universal-social-sdk/actions/workflows/release.yml)
@@ -35,6 +35,15 @@ await Facebook.publishToPage({
 await LinkedIn.createTextPost({
   text: "Cross-platform publishing with one API"
 });
+
+import { YouTube, TikTok, Pinterest, Bluesky, Mastodon, Threads } from "universal-social-sdk";
+
+await YouTube.listMyVideos({ maxResults: 5 });
+await TikTok.listVideos({ maxCount: 10 });
+await Pinterest.listBoards({});
+await Bluesky.postText({ text: "Hello AT Protocol!" });
+await Mastodon.createStatus({ text: "Hello Fediverse!" });
+await Threads.postText({ text: "Hello Threads!" });
 ```
 
 ## Required Environment Variables
@@ -70,6 +79,41 @@ await LinkedIn.createTextPost({
 - `LINKEDIN_ORG_URN` or `LINKEDIN_PERSON_URN`
 - `LINKEDIN_API_VERSION` (default `202510`)
 
+### YouTube
+
+- `YOUTUBE_ACCESS_TOKEN`
+- `YOUTUBE_CHANNEL_ID`
+
+### TikTok
+
+- `TIKTOK_ACCESS_TOKEN`
+- `TIKTOK_OPEN_ID`
+- `TIKTOK_ADVERTISER_ID`
+
+### Pinterest
+
+- `PINTEREST_ACCESS_TOKEN`
+- `PINTEREST_BOARD_ID`
+
+### Bluesky
+
+- `BLUESKY_SERVICE_URL` (default `https://bsky.social`)
+- `BLUESKY_IDENTIFIER`
+- `BLUESKY_APP_PASSWORD`
+- `BLUESKY_ACCESS_JWT`
+- `BLUESKY_REFRESH_JWT`
+
+### Mastodon
+
+- `MASTODON_BASE_URL`
+- `MASTODON_ACCESS_TOKEN`
+- `MASTODON_ACCOUNT_ID`
+
+### Threads
+
+- `THREADS_ACCESS_TOKEN`
+- `THREADS_USER_ID`
+
 ### SDK / Updater
 
 - `SOCIAL_SDK_MAX_RETRIES` (default `3`)
@@ -91,7 +135,7 @@ Creates `.env.example`, copies it to `.env` if missing, and prints OAuth setup l
 - Meta Developers: <https://developers.facebook.com/apps/>
 - LinkedIn Developers: <https://www.linkedin.com/developers/apps>
 
-### Self-updating SDK (Ollama)
+### Documentation Updater
 
 ```bash
 npx universal-social-sdk update
@@ -107,80 +151,27 @@ Flow:
 
 1. Crawls official docs pages for X, Meta Graph API, Instagram Graph API, and LinkedIn.
 2. Extracts clean text and table-like endpoint data with Cheerio.
-3. Sends doc snapshots to local Ollama.
+3. Sends doc snapshots to your local model runtime.
 4. Requests generated method updates + full TypeScript file content.
 5. Shows git-style diffs and asks for confirmation.
 6. Applies patches and rebuilds package.
 
 ## Supported Methods
 
-<!-- AUTO_METHODS_TABLE_START -->
-| Method | Platform | Underlying Endpoint | Required Scopes | Example |
-| --- | --- | --- | --- | --- |
-| `postTweet` | X | `POST /2/tweets` | `tweet.write` | `X.postTweet({ text })` |
-| `postThread` | X | `POST /2/tweets` | `tweet.write` | `X.postThread({ tweets })` |
-| `replyTweet` | X | `POST /2/tweets` | `tweet.write` | `X.replyTweet({ text, inReplyToTweetId })` |
-| `quoteTweet` | X | `POST /2/tweets` | `tweet.write` | `X.quoteTweet({ text, quoteTweetId })` |
-| `deleteTweet` | X | `DELETE /2/tweets/:id` | `tweet.write` | `X.deleteTweet({ tweetId })` |
-| `retweet` | X | `POST /2/users/:id/retweets` | `tweet.write` | `X.retweet({ userId, tweetId })` |
-| `unretweet` | X | `DELETE /2/users/:id/retweets/:tweet_id` | `tweet.write` | `X.unretweet({ userId, tweetId })` |
-| `likeTweet` | X | `POST /2/users/:id/likes` | `like.write` | `X.likeTweet({ userId, tweetId })` |
-| `unlikeTweet` | X | `DELETE /2/users/:id/likes/:tweet_id` | `like.write` | `X.unlikeTweet({ userId, tweetId })` |
-| `uploadMedia` | X | `POST media/upload` | `tweet.write` | `X.uploadMedia({ mediaPath })` |
-| `postPhoto` | X | media upload + `POST /2/tweets` | `tweet.write` | `X.postPhoto({ mediaPath, text })` |
-| `postVideo` | X | media upload + `POST /2/tweets` | `tweet.write` | `X.postVideo({ mediaPath, text })` |
-| `postPoll` | X | `POST /2/tweets` | `tweet.write` | `X.postPoll({ text, options, durationMinutes })` |
-| `sendDirectMessage` | X | DM conversations API | `dm.write` | `X.sendDirectMessage({ recipientId, text })` |
-| `getTweetAnalytics` | X | `GET /2/tweets/:id` | `tweet.read` | `X.getTweetAnalytics({ tweetId })` |
-| `scheduleTweet` | X | local scheduler + `POST /2/tweets` | `tweet.write` | `X.scheduleTweet({ text, publishAt })` |
-| `publishToPage` | Facebook | `POST /{page-id}/feed` | `pages_manage_posts` | `Facebook.publishToPage({ message })` |
-| `publishPhoto` | Facebook | `POST /{page-id}/photos` | `pages_manage_posts` | `Facebook.publishPhoto({ url })` |
-| `publishVideo` | Facebook | `POST /{page-id}/videos` | `pages_manage_posts` | `Facebook.publishVideo({ fileUrl })` |
-| `publishCarousel` | Facebook | `/{page-id}/photos` + `/{page-id}/feed` | `pages_manage_posts` | `Facebook.publishCarousel({ message, photoUrls })` |
-| `publishStory` | Facebook | `POST /{page-id}/photo_stories` | `pages_manage_posts` | `Facebook.publishStory({ photoUrl })` |
-| `schedulePost` | Facebook | `POST /{page-id}/feed` scheduled | `pages_manage_posts` | `Facebook.schedulePost({ message, publishAt })` |
-| `commentOnPost` | Facebook | `POST /{post-id}/comments` | `pages_manage_engagement` | `Facebook.commentOnPost({ postId, message })` |
-| `replyToComment` | Facebook | `POST /{comment-id}/comments` | `pages_manage_engagement` | `Facebook.replyToComment({ commentId, message })` |
-| `likeObject` | Facebook | `POST /{object-id}/likes` | `pages_manage_engagement` | `Facebook.likeObject({ objectId })` |
-| `deletePost` | Facebook | `DELETE /{object-id}` | `pages_manage_posts` | `Facebook.deletePost({ objectId })` |
-| `sendPageMessage` | Facebook | `POST /{page-id}/messages` | Messenger scopes | `Facebook.sendPageMessage({ recipientPsid, message })` |
-| `getPostInsights` | Facebook | `GET /{post-id}/insights` | `read_insights` | `Facebook.getPostInsights({ postId })` |
-| `getPageInsights` | Facebook | `GET /{page-id}/insights` | `read_insights` | `Facebook.getPageInsights({})` |
-| `uploadResumableVideo` | Facebook | `POST /{page-id}/videos` upload phases | `pages_manage_posts` | `Facebook.uploadResumableVideo({ fileSize })` |
-| `listPublishedPosts` | Facebook | `GET /{page-id}/published_posts` | `pages_read_engagement` | `Facebook.listPublishedPosts({})` |
-| `uploadPhoto` | Instagram | `/{ig-user-id}/media` + `/media_publish` | `instagram_content_publish` | `Instagram.uploadPhoto({ imageUrl })` |
-| `uploadVideo` | Instagram | `/{ig-user-id}/media` + `/media_publish` | `instagram_content_publish` | `Instagram.uploadVideo({ videoUrl })` |
-| `uploadReel` | Instagram | `/{ig-user-id}/media` + `/media_publish` | `instagram_content_publish` | `Instagram.uploadReel({ videoUrl })` |
-| `uploadStoryPhoto` | Instagram | `/{ig-user-id}/media` + `/media_publish` | `instagram_content_publish` | `Instagram.uploadStoryPhoto({ imageUrl })` |
-| `uploadStoryVideo` | Instagram | `/{ig-user-id}/media` + `/media_publish` | `instagram_content_publish` | `Instagram.uploadStoryVideo({ videoUrl })` |
-| `publishCarousel` | Instagram | `/{ig-user-id}/media` + `/media_publish` | `instagram_content_publish` | `Instagram.publishCarousel({ items })` |
-| `commentOnMedia` | Instagram | `POST /{media-id}/comments` | `instagram_manage_comments` | `Instagram.commentOnMedia({ mediaId, message })` |
-| `replyToComment` | Instagram | `POST /{comment-id}/replies` | `instagram_manage_comments` | `Instagram.replyToComment({ commentId, message })` |
-| `hideComment` | Instagram | `POST /{comment-id}` | `instagram_manage_comments` | `Instagram.hideComment({ commentId, hide: true })` |
-| `deleteComment` | Instagram | `DELETE /{comment-id}` | `instagram_manage_comments` | `Instagram.deleteComment({ commentId })` |
-| `deleteMedia` | Instagram | `DELETE /{media-id}` | `instagram_content_publish` | `Instagram.deleteMedia({ mediaId })` |
-| `sendPrivateReply` | Instagram | `POST /{comment-id}/private_replies` | `instagram_manage_messages` | `Instagram.sendPrivateReply({ commentId, message })` |
-| `getMediaInsights` | Instagram | `GET /{media-id}/insights` | `instagram_basic` | `Instagram.getMediaInsights({ mediaId })` |
-| `getAccountInsights` | Instagram | `GET /{ig-user-id}/insights` | `instagram_basic` | `Instagram.getAccountInsights({})` |
-| `getPublishingLimit` | Instagram | `GET /{ig-user-id}/content_publishing_limit` | `instagram_content_publish` | `Instagram.getPublishingLimit({})` |
-| `scheduleReel` | Instagram | local scheduler + publish flow | `instagram_content_publish` | `Instagram.scheduleReel({ videoUrl, publishAt })` |
-| `createTextPost` | LinkedIn | `POST /posts` | `w_member_social` or `w_organization_social` | `LinkedIn.createTextPost({ text })` |
-| `createImagePost` | LinkedIn | `POST /posts` | `w_member_social` or `w_organization_social` | `LinkedIn.createImagePost({ text, mediaUrn })` |
-| `createVideoPost` | LinkedIn | `POST /posts` | same as above | `LinkedIn.createVideoPost({ text, mediaUrn })` |
-| `createCarouselPost` | LinkedIn | `POST /posts` | same as above | `LinkedIn.createCarouselPost({ text, mediaUrns })` |
-| `schedulePost` | LinkedIn | local scheduler + `POST /posts` | posting scopes | `LinkedIn.schedulePost({ text, publishAt })` |
-| `commentOnPost` | LinkedIn | `POST /socialActions/comments` | social write scopes | `LinkedIn.commentOnPost({ objectUrn, message })` |
-| `replyToComment` | LinkedIn | `POST /socialActions/comments` | social write scopes | `LinkedIn.replyToComment({ parentCommentUrn, message })` |
-| `deleteComment` | LinkedIn | `DELETE /socialActions/comments/:id` | social write scopes | `LinkedIn.deleteComment({ encodedCommentUrn })` |
-| `likePost` | LinkedIn | `POST /socialActions/likes` | social write scopes | `LinkedIn.likePost({ objectUrn })` |
-| `unlikePost` | LinkedIn | `DELETE /socialActions/.../likes/...` | social write scopes | `LinkedIn.unlikePost({ encodedObjectUrn })` |
-| `sendDirectMessage` | LinkedIn | `POST /messages` | partner messaging scopes | `LinkedIn.sendDirectMessage({ recipientUrn, text })` |
-| `getPostAnalytics` | LinkedIn | stats endpoints | social read scopes | `LinkedIn.getPostAnalytics({ postUrn })` |
-| `getOrganizationAnalytics` | LinkedIn | follower stats endpoints | org read scopes | `LinkedIn.getOrganizationAnalytics({})` |
-| `registerUpload` | LinkedIn | `POST /assets?action=registerUpload` | write scopes | `LinkedIn.registerUpload({ mediaType, fileSize })` |
-| `uploadBinary` | LinkedIn | upload URL from register step | write scopes | `LinkedIn.uploadBinary({ uploadUrl, mediaPath })` |
-| `deletePost` | LinkedIn | `DELETE /posts/:id` | write scopes | `LinkedIn.deletePost({ encodedPostUrn })` |
-<!-- AUTO_METHODS_TABLE_END -->
+Method coverage by platform:
+
+- `X`: posting, threads, replies, quote posts, likes, retweets, DMs, analytics, scheduling
+- `Facebook`: page publishing, stories, comments, reactions, insights, scheduled posts
+- `Instagram`: media/reels/stories, carousels, comments, moderation, insights
+- `LinkedIn`: text/image/video/carousel posts, comments, likes, analytics, media upload
+- `YouTube`: upload sessions, metadata updates, playlists, comments, channel analytics
+- `TikTok`: video publish flow, comments/replies, likes, status checks, analytics
+- `Pinterest`: pin/board management, comments/replies, pin/account analytics
+- `Bluesky`: text posts, links, replies, likes/reposts, feed/search/thread retrieval
+- `Mastodon`: statuses, media posts, favourites/boosts, context, scheduling
+- `Threads`: text/image/video posts, replies, likes, thread/account insights
+
+Complete method list is maintained in `supported-methods.json`.
 
 ## OAuth Setup Guide
 
@@ -207,6 +198,43 @@ Flow:
 3. Configure OAuth 2.0 redirect URLs and request required scopes.
 4. Exchange auth code for access token (and refresh token if enabled).
 5. Screenshot to keep: Products enabled page + OAuth scopes configuration.
+
+### YouTube
+
+1. Open <https://console.cloud.google.com/apis/library/youtube.googleapis.com>.
+2. Enable YouTube Data API v3 for your project.
+3. Configure OAuth consent and create OAuth client credentials.
+4. Exchange user authorization for `YOUTUBE_ACCESS_TOKEN`.
+
+### TikTok
+
+1. Open <https://developers.tiktok.com/>.
+2. Create app, configure login scopes and redirect URI.
+3. Complete OAuth flow and store long-lived `TIKTOK_ACCESS_TOKEN`.
+
+### Pinterest
+
+1. Open <https://developers.pinterest.com/>.
+2. Create app and configure OAuth redirect URI/scopes.
+3. Obtain `PINTEREST_ACCESS_TOKEN` and target `PINTEREST_BOARD_ID`.
+
+### Bluesky
+
+1. Open <https://bsky.app/settings/app-passwords>.
+2. Create an app password for your account.
+3. Set `BLUESKY_IDENTIFIER` and `BLUESKY_APP_PASSWORD`.
+
+### Mastodon
+
+1. Register an application on your Mastodon instance.
+2. Generate an access token with write/read scopes.
+3. Set `MASTODON_BASE_URL`, `MASTODON_ACCESS_TOKEN`, and `MASTODON_ACCOUNT_ID`.
+
+### Threads
+
+1. Open <https://developers.facebook.com/docs/threads>.
+2. Create app, request Threads API scopes, and generate user token.
+3. Set `THREADS_ACCESS_TOKEN` and `THREADS_USER_ID`.
 
 ## Error Handling
 
@@ -247,6 +275,21 @@ npm run test:integration
 
 Integration tests are environment-gated. Create `.env.test` from `.env.test.example` and use sandbox credentials.
 
+### Integration Test Env Matrix
+
+| Platform | Required `.env.test` keys | Required CI secrets |
+| --- | --- | --- |
+| X | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET`, `X_TEST_TWEET_ID` | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET`, `X_TEST_TWEET_ID` |
+| Facebook | `FB_PAGE_ACCESS_TOKEN`, `FB_PAGE_ID` | `FB_PAGE_ACCESS_TOKEN`, `FB_PAGE_ID` |
+| Instagram | `IG_ACCESS_TOKEN`, `IG_USER_ID` | `IG_ACCESS_TOKEN`, `IG_USER_ID` |
+| LinkedIn | `LINKEDIN_ACCESS_TOKEN`, `LINKEDIN_ORG_URN` | `LINKEDIN_ACCESS_TOKEN`, `LINKEDIN_ORG_URN` |
+| YouTube | `YOUTUBE_ACCESS_TOKEN`, `YOUTUBE_CHANNEL_ID` | `YOUTUBE_ACCESS_TOKEN`, `YOUTUBE_CHANNEL_ID` |
+| TikTok | `TIKTOK_ACCESS_TOKEN` | `TIKTOK_ACCESS_TOKEN` |
+| Pinterest | `PINTEREST_ACCESS_TOKEN`, `PINTEREST_BOARD_ID` | `PINTEREST_ACCESS_TOKEN`, `PINTEREST_BOARD_ID` |
+| Bluesky | `BLUESKY_IDENTIFIER`, `BLUESKY_APP_PASSWORD` (`BLUESKY_TEST_ACTOR` optional) | `BLUESKY_IDENTIFIER`, `BLUESKY_APP_PASSWORD`, `BLUESKY_TEST_ACTOR` |
+| Mastodon | `MASTODON_BASE_URL`, `MASTODON_ACCESS_TOKEN`, `MASTODON_ACCOUNT_ID` | `MASTODON_BASE_URL`, `MASTODON_ACCESS_TOKEN`, `MASTODON_ACCOUNT_ID` |
+| Threads | `THREADS_ACCESS_TOKEN`, `THREADS_USER_ID` | `THREADS_ACCESS_TOKEN`, `THREADS_USER_ID` |
+
 ## GitHub Actions
 
 This repo includes:
@@ -267,6 +310,19 @@ Configure these repository secrets to enable integration CI:
 - `IG_USER_ID`
 - `LINKEDIN_ACCESS_TOKEN`
 - `LINKEDIN_ORG_URN`
+- `YOUTUBE_ACCESS_TOKEN`
+- `YOUTUBE_CHANNEL_ID`
+- `TIKTOK_ACCESS_TOKEN`
+- `PINTEREST_ACCESS_TOKEN`
+- `PINTEREST_BOARD_ID`
+- `BLUESKY_IDENTIFIER`
+- `BLUESKY_APP_PASSWORD`
+- `BLUESKY_TEST_ACTOR` (optional; defaults to `BLUESKY_IDENTIFIER` when omitted)
+- `MASTODON_BASE_URL`
+- `MASTODON_ACCESS_TOKEN`
+- `MASTODON_ACCOUNT_ID`
+- `THREADS_ACCESS_TOKEN`
+- `THREADS_USER_ID`
 
 Configure this repository secret for publishing:
 

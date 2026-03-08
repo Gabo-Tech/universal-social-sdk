@@ -8,7 +8,7 @@ This guide explains the expected workflow for code changes, tests, and releases.
 
 - Node.js `>=18.18.0`
 - npm
-- Optional for updater work: local Ollama runtime
+- Optional for updater work: local model runtime
 
 ## Local setup
 

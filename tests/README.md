@@ -14,6 +14,12 @@ Platform integration templates:
 - `tests/integration/facebook.test.ts`
 - `tests/integration/instagram.test.ts`
 - `tests/integration/linkedin.test.ts`
+- `tests/integration/youtube.test.ts`
+- `tests/integration/tiktok.test.ts`
+- `tests/integration/pinterest.test.ts`
+- `tests/integration/bluesky.test.ts`
+- `tests/integration/mastodon.test.ts`
+- `tests/integration/threads.test.ts`
 
 How gating works:
 

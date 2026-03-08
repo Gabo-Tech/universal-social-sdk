@@ -37,6 +37,35 @@ var env = {
     personUrn: process.env.LINKEDIN_PERSON_URN ?? "",
     apiVersion: process.env.LINKEDIN_API_VERSION ?? "202510"
   },
+  youtube: {
+    accessToken: process.env.YOUTUBE_ACCESS_TOKEN ?? "",
+    channelId: process.env.YOUTUBE_CHANNEL_ID ?? ""
+  },
+  tiktok: {
+    accessToken: process.env.TIKTOK_ACCESS_TOKEN ?? "",
+    openId: process.env.TIKTOK_OPEN_ID ?? "",
+    advertiserId: process.env.TIKTOK_ADVERTISER_ID ?? ""
+  },
+  pinterest: {
+    accessToken: process.env.PINTEREST_ACCESS_TOKEN ?? "",
+    boardId: process.env.PINTEREST_BOARD_ID ?? ""
+  },
+  bluesky: {
+    serviceUrl: process.env.BLUESKY_SERVICE_URL ?? "https://bsky.social",
+    identifier: process.env.BLUESKY_IDENTIFIER ?? "",
+    appPassword: process.env.BLUESKY_APP_PASSWORD ?? "",
+    accessJwt: process.env.BLUESKY_ACCESS_JWT ?? "",
+    refreshJwt: process.env.BLUESKY_REFRESH_JWT ?? ""
+  },
+  mastodon: {
+    baseUrl: process.env.MASTODON_BASE_URL ?? "",
+    accessToken: process.env.MASTODON_ACCESS_TOKEN ?? "",
+    accountId: process.env.MASTODON_ACCOUNT_ID ?? ""
+  },
+  threads: {
+    accessToken: process.env.THREADS_ACCESS_TOKEN ?? "",
+    userId: process.env.THREADS_USER_ID ?? ""
+  },
   retry: {
     maxRetries: readNumberEnv("SOCIAL_SDK_MAX_RETRIES", 3),
     baseDelayMs: readNumberEnv("SOCIAL_SDK_RETRY_BASE_MS", 500)
@@ -378,6 +407,216 @@ var schemaMap = {
     }),
     uploadBinary: z.object({ uploadUrl: nonEmpty, mediaPath: nonEmpty }),
     deletePost: z.object({ encodedPostUrn: nonEmpty })
+  },
+  youtube: {
+    createVideoUploadSession: z.object({
+      title: nonEmpty,
+      description: optionalNonEmpty,
+      privacyStatus: z.enum(["private", "public", "unlisted"]).optional()
+    }),
+    uploadBinary: z.object({ uploadUrl: nonEmpty, mediaPath: nonEmpty }),
+    listMyVideos: z.object({ maxResults: z.number().int().positive().optional() }),
+    updateVideoMetadata: z.object({
+      videoId: nonEmpty,
+      title: optionalNonEmpty,
+      description: optionalNonEmpty,
+      privacyStatus: z.enum(["private", "public", "unlisted"]).optional()
+    }),
+    deleteVideo: z.object({ videoId: nonEmpty }),
+    commentOnVideo: z.object({ videoId: nonEmpty, text: nonEmpty }),
+    replyToComment: z.object({ parentCommentId: nonEmpty, text: nonEmpty }),
+    likeVideo: z.object({ videoId: nonEmpty }),
+    unlikeVideo: z.object({ videoId: nonEmpty }),
+    createPlaylist: z.object({
+      title: nonEmpty,
+      description: optionalNonEmpty,
+      privacyStatus: z.enum(["private", "public", "unlisted"]).optional()
+    }),
+    addVideoToPlaylist: z.object({ playlistId: nonEmpty, videoId: nonEmpty }),
+    getChannelAnalytics: z.object({
+      startDate: nonEmpty,
+      endDate: nonEmpty,
+      metrics: optionalNonEmpty
+    }),
+    scheduleVideoMetadataUpdate: z.object({
+      videoId: nonEmpty,
+      title: optionalNonEmpty,
+      description: optionalNonEmpty,
+      privacyStatus: z.enum(["private", "public", "unlisted"]).optional(),
+      publishAt: dateLike
+    })
+  },
+  tiktok: {
+    createPost: z.object({
+      text: nonEmpty,
+      visibility: z.enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"]).optional()
+    }),
+    createVideoPost: z.object({
+      title: nonEmpty,
+      videoUrl: nonEmpty,
+      visibility: z.enum(["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"]).optional()
+    }),
+    getPostStatus: z.object({ publishId: nonEmpty }),
+    listVideos: z.object({ maxCount: z.number().int().positive().optional() }),
+    deleteVideo: z.object({ videoId: nonEmpty }),
+    commentOnVideo: z.object({ videoId: nonEmpty, text: nonEmpty }),
+    replyToComment: z.object({ commentId: nonEmpty, text: nonEmpty }),
+    likeVideo: z.object({ videoId: nonEmpty }),
+    unlikeVideo: z.object({ videoId: nonEmpty }),
+    getVideoAnalytics: z.object({ videoIds: z.array(nonEmpty).min(1) }),
+    getProfileAnalytics: z.object({ fields: z.array(nonEmpty).optional() }),
+    scheduleVideoPost: z.object({
+      title: nonEmpty,
+      videoUrl: nonEmpty,
+      publishAt: dateLike
+    })
+  },
+  pinterest: {
+    createPin: z.object({
+      boardId: optionalNonEmpty,
+      title: nonEmpty,
+      description: optionalNonEmpty,
+      link: optionalNonEmpty,
+      mediaSourceUrl: nonEmpty
+    }),
+    createVideoPin: z.object({
+      boardId: optionalNonEmpty,
+      title: nonEmpty,
+      description: optionalNonEmpty,
+      mediaSourceUrl: nonEmpty
+    }),
+    updatePin: z.object({
+      pinId: nonEmpty,
+      title: optionalNonEmpty,
+      description: optionalNonEmpty,
+      link: optionalNonEmpty
+    }),
+    deletePin: z.object({ pinId: nonEmpty }),
+    listPins: z.object({
+      boardId: optionalNonEmpty,
+      pageSize: z.number().int().positive().optional()
+    }),
+    createBoard: z.object({
+      name: nonEmpty,
+      description: optionalNonEmpty,
+      privacy: z.enum(["PUBLIC", "PROTECTED", "SECRET"]).optional()
+    }),
+    listBoards: z.object({ pageSize: z.number().int().positive().optional() }),
+    commentOnPin: z.object({ pinId: nonEmpty, text: nonEmpty }),
+    replyToComment: z.object({
+      pinId: nonEmpty,
+      commentId: nonEmpty,
+      text: nonEmpty
+    }),
+    getPinAnalytics: z.object({
+      pinId: nonEmpty,
+      startDate: nonEmpty,
+      endDate: nonEmpty
+    }),
+    getAccountAnalytics: z.object({ startDate: nonEmpty, endDate: nonEmpty }),
+    schedulePin: z.object({
+      title: nonEmpty,
+      mediaSourceUrl: nonEmpty,
+      boardId: optionalNonEmpty,
+      publishAt: dateLike
+    })
+  },
+  bluesky: {
+    postText: z.object({ text: nonEmpty }),
+    postWithLink: z.object({ text: nonEmpty, url: nonEmpty }),
+    replyToPost: z.object({
+      text: nonEmpty,
+      rootUri: nonEmpty,
+      rootCid: nonEmpty,
+      parentUri: nonEmpty,
+      parentCid: nonEmpty
+    }),
+    likePost: z.object({ subjectUri: nonEmpty, subjectCid: nonEmpty }),
+    repost: z.object({ subjectUri: nonEmpty, subjectCid: nonEmpty }),
+    deleteRecord: z.object({ uri: nonEmpty }),
+    getAuthorFeed: z.object({
+      actorDidOrHandle: nonEmpty,
+      limit: z.number().int().positive().optional()
+    }),
+    searchPosts: z.object({
+      query: nonEmpty,
+      limit: z.number().int().positive().optional()
+    }),
+    getPostThread: z.object({
+      uri: nonEmpty,
+      depth: z.number().int().positive().optional()
+    }),
+    getNotificationFeed: z.object({
+      limit: z.number().int().positive().optional()
+    }),
+    schedulePost: z.object({ text: nonEmpty, publishAt: dateLike })
+  },
+  mastodon: {
+    createStatus: z.object({
+      text: nonEmpty,
+      visibility: z.enum(["public", "unlisted", "private", "direct"]).optional()
+    }),
+    uploadMedia: z.object({ mediaPath: nonEmpty, description: optionalNonEmpty }),
+    createMediaStatus: z.object({
+      text: nonEmpty,
+      mediaIds: z.array(nonEmpty).min(1),
+      visibility: z.enum(["public", "unlisted", "private", "direct"]).optional()
+    }),
+    replyToStatus: z.object({ statusId: nonEmpty, text: nonEmpty }),
+    deleteStatus: z.object({ statusId: nonEmpty }),
+    favouriteStatus: z.object({ statusId: nonEmpty }),
+    unfavouriteStatus: z.object({ statusId: nonEmpty }),
+    boostStatus: z.object({ statusId: nonEmpty }),
+    unboostStatus: z.object({ statusId: nonEmpty }),
+    listMyStatuses: z.object({ limit: z.number().int().positive().optional() }),
+    getStatusContext: z.object({ statusId: nonEmpty }),
+    getAccountAnalytics: z.object({
+      instanceScope: z.enum(["day", "week", "month"]).optional()
+    }),
+    scheduleStatus: z.object({ text: nonEmpty, publishAt: dateLike })
+  },
+  threads: {
+    postText: z.object({ threadsUserId: optionalNonEmpty, text: nonEmpty }),
+    postImage: z.object({
+      threadsUserId: optionalNonEmpty,
+      text: optionalNonEmpty,
+      imageUrl: nonEmpty
+    }),
+    postVideo: z.object({
+      threadsUserId: optionalNonEmpty,
+      text: optionalNonEmpty,
+      videoUrl: nonEmpty
+    }),
+    replyToThread: z.object({
+      threadsUserId: optionalNonEmpty,
+      threadId: nonEmpty,
+      text: nonEmpty
+    }),
+    deleteThread: z.object({ threadId: nonEmpty }),
+    getThread: z.object({
+      threadId: nonEmpty,
+      fields: z.array(nonEmpty).optional()
+    }),
+    listMyThreads: z.object({
+      threadsUserId: optionalNonEmpty,
+      limit: z.number().int().positive().optional()
+    }),
+    getThreadInsights: z.object({
+      threadId: nonEmpty,
+      metrics: z.array(nonEmpty).optional()
+    }),
+    getAccountInsights: z.object({
+      threadsUserId: optionalNonEmpty,
+      metrics: z.array(nonEmpty).optional(),
+      period: z.enum(["day", "week", "days_28"]).optional()
+    }),
+    likeThread: z.object({ threadId: nonEmpty }),
+    unlikeThread: z.object({ threadId: nonEmpty }),
+    scheduleTextPost: z.object({
+      threadsUserId: optionalNonEmpty,
+      text: nonEmpty,
+      publishAt: dateLike
+    })
   }
 };
 function validatePlatformInput(platform, method, input) {
@@ -1296,11 +1535,1122 @@ var LinkedIn = class _LinkedIn {
     });
   }
 };
+
+// src/platforms/youtube.ts
+import axios3 from "axios";
+var YT_API_BASE = "https://www.googleapis.com/youtube/v3";
+var YT_UPLOAD_BASE = "https://www.googleapis.com/upload/youtube/v3";
+var YT_ANALYTICS_BASE = "https://youtubeanalytics.googleapis.com/v2";
+function authHeader() {
+  if (!env.youtube.accessToken) {
+    throw new SocialError({
+      platform: "youtube",
+      endpoint: "auth",
+      message: "Missing YOUTUBE_ACCESS_TOKEN."
+    });
+  }
+  return { Authorization: `Bearer ${env.youtube.accessToken}` };
+}
+async function youtubeRequest(params) {
+  return withRetries({
+    platform: "youtube",
+    endpoint: params.endpoint,
+    execute: async () => {
+      try {
+        const response = await axios3.request({
+          baseURL: params.upload ? YT_UPLOAD_BASE : YT_API_BASE,
+          url: params.endpoint,
+          method: params.method,
+          params: params.query,
+          data: params.data,
+          headers: {
+            ...authHeader(),
+            "Content-Type": "application/json"
+          }
+        });
+        return response.data;
+      } catch (error) {
+        throw SocialError.normalize({
+          platform: "youtube",
+          endpoint: params.endpoint,
+          error
+        });
+      }
+    }
+  });
+}
+var YouTube = class _YouTube {
+  static async createVideoUploadSession(input) {
+    validatePlatformInput("youtube", "createVideoUploadSession", input);
+    return youtubeRequest({
+      endpoint: "/videos",
+      method: "POST",
+      query: { part: "snippet,status", uploadType: "resumable" },
+      data: {
+        snippet: {
+          title: input.title,
+          description: input.description ?? ""
+        },
+        status: { privacyStatus: input.privacyStatus ?? "private" }
+      },
+      upload: true
+    });
+  }
+  static async uploadBinary(input) {
+    validatePlatformInput("youtube", "uploadBinary", input);
+    const { fileSize } = getFileMeta(input.mediaPath);
+    return withRetries({
+      platform: "youtube",
+      endpoint: "uploadBinary",
+      execute: async () => axios3.put(input.uploadUrl, createUploadStream(input.mediaPath), {
+        maxBodyLength: Infinity,
+        headers: {
+          ...authHeader(),
+          "Content-Length": String(fileSize),
+          "Content-Type": "application/octet-stream"
+        }
+      })
+    });
+  }
+  static async listMyVideos(input) {
+    validatePlatformInput("youtube", "listMyVideos", input);
+    return youtubeRequest({
+      endpoint: "/search",
+      method: "GET",
+      query: {
+        part: "snippet",
+        forMine: true,
+        type: "video",
+        maxResults: input.maxResults ?? 25
+      }
+    });
+  }
+  static async updateVideoMetadata(input) {
+    validatePlatformInput("youtube", "updateVideoMetadata", input);
+    return youtubeRequest({
+      endpoint: "/videos",
+      method: "PUT",
+      query: { part: "snippet,status" },
+      data: {
+        id: input.videoId,
+        snippet: {
+          title: input.title,
+          description: input.description
+        },
+        status: {
+          privacyStatus: input.privacyStatus
+        }
+      }
+    });
+  }
+  static async deleteVideo(input) {
+    validatePlatformInput("youtube", "deleteVideo", input);
+    return youtubeRequest({
+      endpoint: "/videos",
+      method: "DELETE",
+      query: { id: input.videoId }
+    });
+  }
+  static async commentOnVideo(input) {
+    validatePlatformInput("youtube", "commentOnVideo", input);
+    return youtubeRequest({
+      endpoint: "/commentThreads",
+      method: "POST",
+      query: { part: "snippet" },
+      data: {
+        snippet: {
+          videoId: input.videoId,
+          topLevelComment: {
+            snippet: { textOriginal: input.text }
+          }
+        }
+      }
+    });
+  }
+  static async replyToComment(input) {
+    validatePlatformInput("youtube", "replyToComment", input);
+    return youtubeRequest({
+      endpoint: "/comments",
+      method: "POST",
+      query: { part: "snippet" },
+      data: {
+        snippet: {
+          parentId: input.parentCommentId,
+          textOriginal: input.text
+        }
+      }
+    });
+  }
+  static async likeVideo(input) {
+    validatePlatformInput("youtube", "likeVideo", input);
+    return youtubeRequest({
+      endpoint: "/videos/rate",
+      method: "POST",
+      query: { id: input.videoId, rating: "like" }
+    });
+  }
+  static async unlikeVideo(input) {
+    validatePlatformInput("youtube", "unlikeVideo", input);
+    return youtubeRequest({
+      endpoint: "/videos/rate",
+      method: "POST",
+      query: { id: input.videoId, rating: "none" }
+    });
+  }
+  static async createPlaylist(input) {
+    validatePlatformInput("youtube", "createPlaylist", input);
+    return youtubeRequest({
+      endpoint: "/playlists",
+      method: "POST",
+      query: { part: "snippet,status" },
+      data: {
+        snippet: {
+          title: input.title,
+          description: input.description ?? ""
+        },
+        status: { privacyStatus: input.privacyStatus ?? "private" }
+      }
+    });
+  }
+  static async addVideoToPlaylist(input) {
+    validatePlatformInput("youtube", "addVideoToPlaylist", input);
+    return youtubeRequest({
+      endpoint: "/playlistItems",
+      method: "POST",
+      query: { part: "snippet" },
+      data: {
+        snippet: {
+          playlistId: input.playlistId,
+          resourceId: {
+            kind: "youtube#video",
+            videoId: input.videoId
+          }
+        }
+      }
+    });
+  }
+  static async getChannelAnalytics(input) {
+    validatePlatformInput("youtube", "getChannelAnalytics", input);
+    return withRetries({
+      platform: "youtube",
+      endpoint: "/reports",
+      execute: async () => {
+        const response = await axios3.get(`${YT_ANALYTICS_BASE}/reports`, {
+          params: {
+            ids: `channel==${env.youtube.channelId}`,
+            startDate: input.startDate,
+            endDate: input.endDate,
+            metrics: input.metrics ?? "views,likes,comments,estimatedMinutesWatched"
+          },
+          headers: authHeader()
+        });
+        return response.data;
+      }
+    });
+  }
+  static async scheduleVideoMetadataUpdate(input) {
+    validatePlatformInput("youtube", "scheduleVideoMetadataUpdate", input);
+    return scheduleTask({
+      id: `youtube-schedule-${Date.now()}`,
+      runAt: input.publishAt,
+      task: async () => _YouTube.updateVideoMetadata({
+        videoId: input.videoId,
+        title: input.title,
+        description: input.description,
+        privacyStatus: input.privacyStatus
+      })
+    });
+  }
+};
+
+// src/platforms/tiktok.ts
+import axios4 from "axios";
+var TIKTOK_API_BASE = "https://open.tiktokapis.com/v2";
+function tiktokHeaders() {
+  if (!env.tiktok.accessToken) {
+    throw new SocialError({
+      platform: "tiktok",
+      endpoint: "auth",
+      message: "Missing TIKTOK_ACCESS_TOKEN."
+    });
+  }
+  return {
+    Authorization: `Bearer ${env.tiktok.accessToken}`,
+    "Content-Type": "application/json"
+  };
+}
+async function tikTokRequest(params) {
+  return withRetries({
+    platform: "tiktok",
+    endpoint: params.endpoint,
+    execute: async () => {
+      try {
+        const response = await axios4.request({
+          baseURL: TIKTOK_API_BASE,
+          url: params.endpoint,
+          method: params.method,
+          params: params.query,
+          data: params.data,
+          headers: tiktokHeaders()
+        });
+        return response.data;
+      } catch (error) {
+        throw SocialError.normalize({
+          platform: "tiktok",
+          endpoint: params.endpoint,
+          error
+        });
+      }
+    }
+  });
+}
+var TikTok = class _TikTok {
+  static async createPost(input) {
+    validatePlatformInput("tiktok", "createPost", input);
+    return tikTokRequest({
+      endpoint: "/post/publish/inbox/video/init/",
+      method: "POST",
+      data: {
+        post_info: {
+          title: input.text,
+          privacy_level: input.visibility ?? "PUBLIC_TO_EVERYONE"
+        },
+        source_info: {
+          source: "PULL_FROM_URL",
+          video_url: ""
+        }
+      }
+    });
+  }
+  static async createVideoPost(input) {
+    validatePlatformInput("tiktok", "createVideoPost", input);
+    return tikTokRequest({
+      endpoint: "/post/publish/video/init/",
+      method: "POST",
+      data: {
+        post_info: {
+          title: input.title,
+          privacy_level: input.visibility ?? "PUBLIC_TO_EVERYONE"
+        },
+        source_info: {
+          source: "PULL_FROM_URL",
+          video_url: input.videoUrl
+        }
+      }
+    });
+  }
+  static async getPostStatus(input) {
+    validatePlatformInput("tiktok", "getPostStatus", input);
+    return tikTokRequest({
+      endpoint: "/post/publish/status/fetch/",
+      method: "POST",
+      data: { publish_id: input.publishId }
+    });
+  }
+  static async listVideos(input) {
+    validatePlatformInput("tiktok", "listVideos", input);
+    return tikTokRequest({
+      endpoint: "/video/list/",
+      method: "POST",
+      data: { max_count: input.maxCount ?? 20 }
+    });
+  }
+  static async deleteVideo(input) {
+    validatePlatformInput("tiktok", "deleteVideo", input);
+    return tikTokRequest({
+      endpoint: "/video/delete/",
+      method: "POST",
+      data: { video_id: input.videoId }
+    });
+  }
+  static async commentOnVideo(input) {
+    validatePlatformInput("tiktok", "commentOnVideo", input);
+    return tikTokRequest({
+      endpoint: "/video/comment/create/",
+      method: "POST",
+      data: { video_id: input.videoId, text: input.text }
+    });
+  }
+  static async replyToComment(input) {
+    validatePlatformInput("tiktok", "replyToComment", input);
+    return tikTokRequest({
+      endpoint: "/video/comment/reply/",
+      method: "POST",
+      data: { comment_id: input.commentId, text: input.text }
+    });
+  }
+  static async likeVideo(input) {
+    validatePlatformInput("tiktok", "likeVideo", input);
+    return tikTokRequest({
+      endpoint: "/video/like/",
+      method: "POST",
+      data: { video_id: input.videoId }
+    });
+  }
+  static async unlikeVideo(input) {
+    validatePlatformInput("tiktok", "unlikeVideo", input);
+    return tikTokRequest({
+      endpoint: "/video/unlike/",
+      method: "POST",
+      data: { video_id: input.videoId }
+    });
+  }
+  static async getVideoAnalytics(input) {
+    validatePlatformInput("tiktok", "getVideoAnalytics", input);
+    return tikTokRequest({
+      endpoint: "/research/video/query/",
+      method: "POST",
+      data: { filters: { video_ids: input.videoIds } }
+    });
+  }
+  static async getProfileAnalytics(input) {
+    validatePlatformInput("tiktok", "getProfileAnalytics", input);
+    return tikTokRequest({
+      endpoint: "/user/info/",
+      method: "GET",
+      query: {
+        fields: (input.fields ?? ["display_name", "follower_count", "video_count"]).join(",")
+      }
+    });
+  }
+  static async scheduleVideoPost(input) {
+    validatePlatformInput("tiktok", "scheduleVideoPost", input);
+    return scheduleTask({
+      id: `tiktok-schedule-${Date.now()}`,
+      runAt: input.publishAt,
+      task: async () => _TikTok.createVideoPost({
+        title: input.title,
+        videoUrl: input.videoUrl
+      })
+    });
+  }
+};
+
+// src/platforms/pinterest.ts
+import axios5 from "axios";
+var PINTEREST_BASE = "https://api.pinterest.com/v5";
+function pinterestHeaders() {
+  if (!env.pinterest.accessToken) {
+    throw new SocialError({
+      platform: "pinterest",
+      endpoint: "auth",
+      message: "Missing PINTEREST_ACCESS_TOKEN."
+    });
+  }
+  return {
+    Authorization: `Bearer ${env.pinterest.accessToken}`,
+    "Content-Type": "application/json"
+  };
+}
+async function pinterestRequest(params) {
+  return withRetries({
+    platform: "pinterest",
+    endpoint: params.endpoint,
+    execute: async () => {
+      try {
+        const response = await axios5.request({
+          baseURL: PINTEREST_BASE,
+          url: params.endpoint,
+          method: params.method,
+          params: params.query,
+          data: params.data,
+          headers: pinterestHeaders()
+        });
+        return response.data;
+      } catch (error) {
+        throw SocialError.normalize({
+          platform: "pinterest",
+          endpoint: params.endpoint,
+          error
+        });
+      }
+    }
+  });
+}
+var Pinterest = class _Pinterest {
+  static async createPin(input) {
+    validatePlatformInput("pinterest", "createPin", input);
+    return pinterestRequest({
+      endpoint: "/pins",
+      method: "POST",
+      data: {
+        board_id: input.boardId ?? env.pinterest.boardId,
+        title: input.title,
+        description: input.description,
+        link: input.link,
+        media_source: {
+          source_type: "image_url",
+          url: input.mediaSourceUrl
+        }
+      }
+    });
+  }
+  static async createVideoPin(input) {
+    validatePlatformInput("pinterest", "createVideoPin", input);
+    return pinterestRequest({
+      endpoint: "/pins",
+      method: "POST",
+      data: {
+        board_id: input.boardId ?? env.pinterest.boardId,
+        title: input.title,
+        description: input.description,
+        media_source: {
+          source_type: "video_url",
+          url: input.mediaSourceUrl
+        }
+      }
+    });
+  }
+  static async updatePin(input) {
+    validatePlatformInput("pinterest", "updatePin", input);
+    return pinterestRequest({
+      endpoint: `/pins/${input.pinId}`,
+      method: "PATCH",
+      data: {
+        title: input.title,
+        description: input.description,
+        link: input.link
+      }
+    });
+  }
+  static async deletePin(input) {
+    validatePlatformInput("pinterest", "deletePin", input);
+    return pinterestRequest({
+      endpoint: `/pins/${input.pinId}`,
+      method: "DELETE"
+    });
+  }
+  static async listPins(input) {
+    validatePlatformInput("pinterest", "listPins", input);
+    return pinterestRequest({
+      endpoint: "/pins",
+      method: "GET",
+      query: {
+        board_id: input.boardId ?? env.pinterest.boardId,
+        page_size: input.pageSize ?? 25
+      }
+    });
+  }
+  static async createBoard(input) {
+    validatePlatformInput("pinterest", "createBoard", input);
+    return pinterestRequest({
+      endpoint: "/boards",
+      method: "POST",
+      data: {
+        name: input.name,
+        description: input.description,
+        privacy: input.privacy ?? "PUBLIC"
+      }
+    });
+  }
+  static async listBoards(input) {
+    validatePlatformInput("pinterest", "listBoards", input);
+    return pinterestRequest({
+      endpoint: "/boards",
+      method: "GET",
+      query: { page_size: input.pageSize ?? 25 }
+    });
+  }
+  static async commentOnPin(input) {
+    validatePlatformInput("pinterest", "commentOnPin", input);
+    return pinterestRequest({
+      endpoint: `/pins/${input.pinId}/comments`,
+      method: "POST",
+      data: { text: input.text }
+    });
+  }
+  static async replyToComment(input) {
+    validatePlatformInput("pinterest", "replyToComment", input);
+    return pinterestRequest({
+      endpoint: `/pins/${input.pinId}/comments/${input.commentId}/replies`,
+      method: "POST",
+      data: { text: input.text }
+    });
+  }
+  static async getPinAnalytics(input) {
+    validatePlatformInput("pinterest", "getPinAnalytics", input);
+    return pinterestRequest({
+      endpoint: `/pins/${input.pinId}/analytics`,
+      method: "GET",
+      query: { start_date: input.startDate, end_date: input.endDate }
+    });
+  }
+  static async getAccountAnalytics(input) {
+    validatePlatformInput("pinterest", "getAccountAnalytics", input);
+    return pinterestRequest({
+      endpoint: "/user_account/analytics",
+      method: "GET",
+      query: { start_date: input.startDate, end_date: input.endDate }
+    });
+  }
+  static async schedulePin(input) {
+    validatePlatformInput("pinterest", "schedulePin", input);
+    return scheduleTask({
+      id: `pinterest-schedule-${Date.now()}`,
+      runAt: input.publishAt,
+      task: async () => _Pinterest.createPin({
+        title: input.title,
+        mediaSourceUrl: input.mediaSourceUrl,
+        boardId: input.boardId
+      })
+    });
+  }
+};
+
+// src/platforms/bluesky.ts
+import axios6 from "axios";
+var DEFAULT_SERVICE = "https://bsky.social";
+function serviceBase() {
+  return `${env.bluesky.serviceUrl || DEFAULT_SERVICE}/xrpc`;
+}
+var accessJwt = env.bluesky.accessJwt;
+var did = "";
+async function ensureSession() {
+  if (accessJwt && did) {
+    return { accessJwt, did };
+  }
+  if (!env.bluesky.identifier || !env.bluesky.appPassword) {
+    throw new SocialError({
+      platform: "bluesky",
+      endpoint: "createSession",
+      message: "Missing Bluesky session credentials. Set BLUESKY_IDENTIFIER and BLUESKY_APP_PASSWORD, or provide BLUESKY_ACCESS_JWT."
+    });
+  }
+  const response = await axios6.post(`${serviceBase()}/com.atproto.server.createSession`, {
+    identifier: env.bluesky.identifier,
+    password: env.bluesky.appPassword
+  });
+  accessJwt = response.data.accessJwt;
+  did = response.data.did;
+  return { accessJwt, did };
+}
+async function bskyRequest(params) {
+  const session = await ensureSession();
+  return withRetries({
+    platform: "bluesky",
+    endpoint: params.endpoint,
+    execute: async () => {
+      try {
+        const response = await axios6.request({
+          baseURL: serviceBase(),
+          url: params.endpoint,
+          method: params.method,
+          params: params.query,
+          data: params.data,
+          headers: {
+            Authorization: `Bearer ${session.accessJwt}`,
+            "Content-Type": "application/json"
+          }
+        });
+        return response.data;
+      } catch (error) {
+        throw SocialError.normalize({
+          platform: "bluesky",
+          endpoint: params.endpoint,
+          error
+        });
+      }
+    }
+  });
+}
+async function createRecord(collection, record) {
+  const session = await ensureSession();
+  return bskyRequest({
+    endpoint: "/com.atproto.repo.createRecord",
+    method: "POST",
+    data: {
+      repo: session.did,
+      collection,
+      record
+    }
+  });
+}
+var Bluesky = class _Bluesky {
+  static async postText(input) {
+    validatePlatformInput("bluesky", "postText", input);
+    return createRecord("app.bsky.feed.post", {
+      $type: "app.bsky.feed.post",
+      text: input.text,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  }
+  static async postWithLink(input) {
+    validatePlatformInput("bluesky", "postWithLink", input);
+    return createRecord("app.bsky.feed.post", {
+      $type: "app.bsky.feed.post",
+      text: `${input.text}
+${input.url}`,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  }
+  static async replyToPost(input) {
+    validatePlatformInput("bluesky", "replyToPost", input);
+    return createRecord("app.bsky.feed.post", {
+      $type: "app.bsky.feed.post",
+      text: input.text,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+      reply: {
+        root: { uri: input.rootUri, cid: input.rootCid },
+        parent: { uri: input.parentUri, cid: input.parentCid }
+      }
+    });
+  }
+  static async likePost(input) {
+    validatePlatformInput("bluesky", "likePost", input);
+    return createRecord("app.bsky.feed.like", {
+      $type: "app.bsky.feed.like",
+      subject: { uri: input.subjectUri, cid: input.subjectCid },
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  }
+  static async repost(input) {
+    validatePlatformInput("bluesky", "repost", input);
+    return createRecord("app.bsky.feed.repost", {
+      $type: "app.bsky.feed.repost",
+      subject: { uri: input.subjectUri, cid: input.subjectCid },
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  }
+  static async deleteRecord(input) {
+    validatePlatformInput("bluesky", "deleteRecord", input);
+    const session = await ensureSession();
+    const parsed = new URL(input.uri.replace("at://", "https://"));
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const [collection, rkey] = parts.slice(-2);
+    return bskyRequest({
+      endpoint: "/com.atproto.repo.deleteRecord",
+      method: "POST",
+      data: {
+        repo: session.did,
+        collection,
+        rkey
+      }
+    });
+  }
+  static async getAuthorFeed(input) {
+    validatePlatformInput("bluesky", "getAuthorFeed", input);
+    return bskyRequest({
+      endpoint: "/app.bsky.feed.getAuthorFeed",
+      method: "GET",
+      query: {
+        actor: input.actorDidOrHandle,
+        limit: input.limit ?? 25
+      }
+    });
+  }
+  static async searchPosts(input) {
+    validatePlatformInput("bluesky", "searchPosts", input);
+    return bskyRequest({
+      endpoint: "/app.bsky.feed.searchPosts",
+      method: "GET",
+      query: { q: input.query, limit: input.limit ?? 25 }
+    });
+  }
+  static async getPostThread(input) {
+    validatePlatformInput("bluesky", "getPostThread", input);
+    return bskyRequest({
+      endpoint: "/app.bsky.feed.getPostThread",
+      method: "GET",
+      query: { uri: input.uri, depth: input.depth ?? 6 }
+    });
+  }
+  static async getNotificationFeed(input) {
+    validatePlatformInput("bluesky", "getNotificationFeed", input);
+    return bskyRequest({
+      endpoint: "/app.bsky.notification.listNotifications",
+      method: "GET",
+      query: { limit: input.limit ?? 25 }
+    });
+  }
+  static async schedulePost(input) {
+    validatePlatformInput("bluesky", "schedulePost", input);
+    return scheduleTask({
+      id: `bluesky-schedule-${Date.now()}`,
+      runAt: input.publishAt,
+      task: async () => _Bluesky.postText({ text: input.text })
+    });
+  }
+};
+
+// src/platforms/mastodon.ts
+import axios7 from "axios";
+function baseUrl() {
+  if (!env.mastodon.baseUrl) {
+    throw new SocialError({
+      platform: "mastodon",
+      endpoint: "baseUrl",
+      message: "Missing MASTODON_BASE_URL."
+    });
+  }
+  return env.mastodon.baseUrl.replace(/\/$/, "");
+}
+function mastodonHeaders(extra) {
+  if (!env.mastodon.accessToken) {
+    throw new SocialError({
+      platform: "mastodon",
+      endpoint: "auth",
+      message: "Missing MASTODON_ACCESS_TOKEN."
+    });
+  }
+  return {
+    Authorization: `Bearer ${env.mastodon.accessToken}`,
+    ...extra
+  };
+}
+async function mastodonRequest(params) {
+  return withRetries({
+    platform: "mastodon",
+    endpoint: params.endpoint,
+    execute: async () => {
+      try {
+        const response = await axios7.request({
+          baseURL: `${baseUrl()}/api/v1`,
+          url: params.endpoint,
+          method: params.method,
+          params: params.query,
+          data: params.data,
+          headers: mastodonHeaders(params.headers)
+        });
+        return response.data;
+      } catch (error) {
+        throw SocialError.normalize({
+          platform: "mastodon",
+          endpoint: params.endpoint,
+          error
+        });
+      }
+    }
+  });
+}
+var Mastodon = class _Mastodon {
+  static async createStatus(input) {
+    validatePlatformInput("mastodon", "createStatus", input);
+    return mastodonRequest({
+      endpoint: "/statuses",
+      method: "POST",
+      data: {
+        status: input.text,
+        visibility: input.visibility ?? "public"
+      }
+    });
+  }
+  static async uploadMedia(input) {
+    validatePlatformInput("mastodon", "uploadMedia", input);
+    const { fileSize } = getFileMeta(input.mediaPath);
+    return withRetries({
+      platform: "mastodon",
+      endpoint: "/media",
+      execute: async () => axios7.post(`${baseUrl()}/api/v2/media`, createUploadStream(input.mediaPath), {
+        headers: mastodonHeaders({
+          "Content-Length": String(fileSize),
+          "Content-Type": "application/octet-stream"
+        }),
+        maxBodyLength: Infinity
+      })
+    });
+  }
+  static async createMediaStatus(input) {
+    validatePlatformInput("mastodon", "createMediaStatus", input);
+    return mastodonRequest({
+      endpoint: "/statuses",
+      method: "POST",
+      data: {
+        status: input.text,
+        media_ids: input.mediaIds,
+        visibility: input.visibility ?? "public"
+      }
+    });
+  }
+  static async replyToStatus(input) {
+    validatePlatformInput("mastodon", "replyToStatus", input);
+    return mastodonRequest({
+      endpoint: "/statuses",
+      method: "POST",
+      data: {
+        status: input.text,
+        in_reply_to_id: input.statusId
+      }
+    });
+  }
+  static async deleteStatus(input) {
+    validatePlatformInput("mastodon", "deleteStatus", input);
+    return mastodonRequest({
+      endpoint: `/statuses/${input.statusId}`,
+      method: "DELETE"
+    });
+  }
+  static async favouriteStatus(input) {
+    validatePlatformInput("mastodon", "favouriteStatus", input);
+    return mastodonRequest({
+      endpoint: `/statuses/${input.statusId}/favourite`,
+      method: "POST"
+    });
+  }
+  static async unfavouriteStatus(input) {
+    validatePlatformInput("mastodon", "unfavouriteStatus", input);
+    return mastodonRequest({
+      endpoint: `/statuses/${input.statusId}/unfavourite`,
+      method: "POST"
+    });
+  }
+  static async boostStatus(input) {
+    validatePlatformInput("mastodon", "boostStatus", input);
+    return mastodonRequest({
+      endpoint: `/statuses/${input.statusId}/reblog`,
+      method: "POST"
+    });
+  }
+  static async unboostStatus(input) {
+    validatePlatformInput("mastodon", "unboostStatus", input);
+    return mastodonRequest({
+      endpoint: `/statuses/${input.statusId}/unreblog`,
+      method: "POST"
+    });
+  }
+  static async listMyStatuses(input) {
+    validatePlatformInput("mastodon", "listMyStatuses", input);
+    const accountId = env.mastodon.accountId;
+    if (!accountId) {
+      throw new SocialError({
+        platform: "mastodon",
+        endpoint: "accountId",
+        message: "Missing MASTODON_ACCOUNT_ID."
+      });
+    }
+    return mastodonRequest({
+      endpoint: `/accounts/${accountId}/statuses`,
+      method: "GET",
+      query: { limit: input.limit ?? 20 }
+    });
+  }
+  static async getStatusContext(input) {
+    validatePlatformInput("mastodon", "getStatusContext", input);
+    return mastodonRequest({
+      endpoint: `/statuses/${input.statusId}/context`,
+      method: "GET"
+    });
+  }
+  static async getAccountAnalytics(input) {
+    validatePlatformInput("mastodon", "getAccountAnalytics", input);
+    return mastodonRequest({
+      endpoint: "/accounts/verify_credentials",
+      method: "GET",
+      query: { scope: input.instanceScope ?? "day" }
+    });
+  }
+  static async scheduleStatus(input) {
+    validatePlatformInput("mastodon", "scheduleStatus", input);
+    return scheduleTask({
+      id: `mastodon-schedule-${Date.now()}`,
+      runAt: input.publishAt,
+      task: async () => _Mastodon.createStatus({ text: input.text })
+    });
+  }
+};
+
+// src/platforms/threads.ts
+import axios8 from "axios";
+function graphBase() {
+  return `https://graph.facebook.com/${env.meta.graphVersion}`;
+}
+function threadsUserIdOrThrow(inputUserId) {
+  const userId = inputUserId ?? env.threads.userId;
+  if (!userId) {
+    throw new SocialError({
+      platform: "threads",
+      endpoint: "threads-user-id",
+      message: "Missing THREADS_USER_ID (or pass threadsUserId)."
+    });
+  }
+  return userId;
+}
+function threadsTokenOrThrow() {
+  const token = env.threads.accessToken || env.meta.igToken;
+  if (!token) {
+    throw new SocialError({
+      platform: "threads",
+      endpoint: "threads-token",
+      message: "Missing THREADS_ACCESS_TOKEN (or IG_ACCESS_TOKEN fallback)."
+    });
+  }
+  return token;
+}
+async function threadsRequest(params) {
+  return withRetries({
+    platform: "threads",
+    endpoint: params.endpoint,
+    execute: async () => {
+      try {
+        const response = await axios8.request({
+          baseURL: graphBase(),
+          url: params.endpoint,
+          method: params.method,
+          params: {
+            ...params.query,
+            access_token: threadsTokenOrThrow()
+          },
+          data: params.data
+        });
+        return response.data;
+      } catch (error) {
+        throw SocialError.normalize({
+          platform: "threads",
+          endpoint: params.endpoint,
+          error
+        });
+      }
+    }
+  });
+}
+async function createContainer(params) {
+  return threadsRequest({
+    endpoint: `/${params.threadsUserId}/threads`,
+    method: "POST",
+    data: {
+      media_type: params.mediaType ?? "TEXT",
+      text: params.text,
+      image_url: params.imageUrl,
+      video_url: params.videoUrl,
+      reply_to_id: params.replyToId
+    }
+  });
+}
+async function publishContainer2(threadsUserId, creationId) {
+  return threadsRequest({
+    endpoint: `/${threadsUserId}/threads_publish`,
+    method: "POST",
+    data: { creation_id: creationId }
+  });
+}
+var Threads = class _Threads {
+  static async postText(input) {
+    validatePlatformInput("threads", "postText", input);
+    const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
+    const container = await createContainer({
+      threadsUserId,
+      mediaType: "TEXT",
+      text: input.text
+    });
+    return publishContainer2(threadsUserId, container.id);
+  }
+  static async postImage(input) {
+    validatePlatformInput("threads", "postImage", input);
+    const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
+    const container = await createContainer({
+      threadsUserId,
+      mediaType: "IMAGE",
+      text: input.text,
+      imageUrl: input.imageUrl
+    });
+    return publishContainer2(threadsUserId, container.id);
+  }
+  static async postVideo(input) {
+    validatePlatformInput("threads", "postVideo", input);
+    const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
+    const container = await createContainer({
+      threadsUserId,
+      mediaType: "VIDEO",
+      text: input.text,
+      videoUrl: input.videoUrl
+    });
+    return publishContainer2(threadsUserId, container.id);
+  }
+  static async replyToThread(input) {
+    validatePlatformInput("threads", "replyToThread", input);
+    const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
+    const container = await createContainer({
+      threadsUserId,
+      mediaType: "TEXT",
+      text: input.text,
+      replyToId: input.threadId
+    });
+    return publishContainer2(threadsUserId, container.id);
+  }
+  static async deleteThread(input) {
+    validatePlatformInput("threads", "deleteThread", input);
+    return threadsRequest({
+      endpoint: `/${input.threadId}`,
+      method: "DELETE"
+    });
+  }
+  static async getThread(input) {
+    validatePlatformInput("threads", "getThread", input);
+    return threadsRequest({
+      endpoint: `/${input.threadId}`,
+      method: "GET",
+      query: {
+        fields: (input.fields ?? ["id", "text", "timestamp", "permalink"]).join(",")
+      }
+    });
+  }
+  static async listMyThreads(input) {
+    validatePlatformInput("threads", "listMyThreads", input);
+    const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
+    return threadsRequest({
+      endpoint: `/${threadsUserId}/threads`,
+      method: "GET",
+      query: { limit: input.limit ?? 25 }
+    });
+  }
+  static async getThreadInsights(input) {
+    validatePlatformInput("threads", "getThreadInsights", input);
+    return threadsRequest({
+      endpoint: `/${input.threadId}/insights`,
+      method: "GET",
+      query: {
+        metric: (input.metrics ?? ["views", "likes", "replies", "reposts"]).join(",")
+      }
+    });
+  }
+  static async getAccountInsights(input) {
+    validatePlatformInput("threads", "getAccountInsights", input);
+    const threadsUserId = threadsUserIdOrThrow(input.threadsUserId);
+    return threadsRequest({
+      endpoint: `/${threadsUserId}/threads_insights`,
+      method: "GET",
+      query: {
+        metric: (input.metrics ?? ["views", "followers_count", "likes"]).join(","),
+        period: input.period ?? "day"
+      }
+    });
+  }
+  static async likeThread(input) {
+    validatePlatformInput("threads", "likeThread", input);
+    return threadsRequest({
+      endpoint: `/${input.threadId}/likes`,
+      method: "POST"
+    });
+  }
+  static async unlikeThread(input) {
+    validatePlatformInput("threads", "unlikeThread", input);
+    return threadsRequest({
+      endpoint: `/${input.threadId}/likes`,
+      method: "DELETE"
+    });
+  }
+  static async scheduleTextPost(input) {
+    validatePlatformInput("threads", "scheduleTextPost", input);
+    return scheduleTask({
+      id: `threads-schedule-${Date.now()}`,
+      runAt: input.publishAt,
+      task: async () => _Threads.postText({
+        threadsUserId: input.threadsUserId,
+        text: input.text
+      })
+    });
+  }
+};
 export {
+  Bluesky,
   Facebook,
   Instagram,
   LinkedIn,
+  Mastodon,
+  Pinterest,
   SocialError,
-  X
+  Threads,
+  TikTok,
+  X,
+  YouTube
 };
 //# sourceMappingURL=index.js.map

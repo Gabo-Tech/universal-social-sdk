@@ -31,6 +31,35 @@ LINKEDIN_ORG_URN=
 LINKEDIN_PERSON_URN=
 LINKEDIN_API_VERSION=202510
 
+# YouTube
+YOUTUBE_ACCESS_TOKEN=
+YOUTUBE_CHANNEL_ID=
+
+# TikTok
+TIKTOK_ACCESS_TOKEN=
+TIKTOK_OPEN_ID=
+TIKTOK_ADVERTISER_ID=
+
+# Pinterest
+PINTEREST_ACCESS_TOKEN=
+PINTEREST_BOARD_ID=
+
+# Bluesky
+BLUESKY_SERVICE_URL=https://bsky.social
+BLUESKY_IDENTIFIER=
+BLUESKY_APP_PASSWORD=
+BLUESKY_ACCESS_JWT=
+BLUESKY_REFRESH_JWT=
+
+# Mastodon
+MASTODON_BASE_URL=
+MASTODON_ACCESS_TOKEN=
+MASTODON_ACCOUNT_ID=
+
+# Threads
+THREADS_ACCESS_TOKEN=
+THREADS_USER_ID=
+
 # SDK behavior
 SOCIAL_SDK_MAX_RETRIES=3
 SOCIAL_SDK_RETRY_BASE_MS=500
@@ -50,6 +79,30 @@ const OAUTH_LINKS = [
   {
     platform: "LinkedIn",
     url: "https://www.linkedin.com/developers/apps"
+  },
+  {
+    platform: "YouTube",
+    url: "https://console.cloud.google.com/apis/library/youtube.googleapis.com"
+  },
+  {
+    platform: "TikTok",
+    url: "https://developers.tiktok.com/"
+  },
+  {
+    platform: "Pinterest",
+    url: "https://developers.pinterest.com/"
+  },
+  {
+    platform: "Bluesky",
+    url: "https://bsky.app/settings/app-passwords"
+  },
+  {
+    platform: "Mastodon",
+    url: "https://docs.joinmastodon.org/client/token/"
+  },
+  {
+    platform: "Threads",
+    url: "https://developers.facebook.com/docs/threads"
   }
 ];
 
@@ -86,6 +139,9 @@ export async function runInitCommand(cwd: string): Promise<void> {
   console.log("- X: app dashboard with OAuth 1.0a user tokens and callback URL.");
   console.log("- Meta: App Review permissions screen + Page token debug screen.");
   console.log("- LinkedIn: Products tab + OAuth 2.0 redirect URL + scopes list.");
+  console.log("- YouTube: OAuth consent screen + Data API enabled credentials.");
+  console.log("- TikTok/Pinterest: app scopes + redirect URI + long-lived token.");
+  console.log("- Bluesky/Mastodon/Threads: app password or token issuance screens.");
 
   const answers = await inquirer.prompt([
     {

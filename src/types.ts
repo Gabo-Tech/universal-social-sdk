@@ -1,4 +1,14 @@
-export type Platform = "x" | "facebook" | "instagram" | "linkedin";
+export type Platform =
+  | "x"
+  | "facebook"
+  | "instagram"
+  | "linkedin"
+  | "youtube"
+  | "tiktok"
+  | "pinterest"
+  | "bluesky"
+  | "mastodon"
+  | "threads";
 
 export interface BaseResult<T = unknown> {
   ok: boolean;

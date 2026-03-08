@@ -49,7 +49,18 @@ npm install universal-social-sdk
 They receive prebuilt artifacts from `dist/`. Their app imports:
 
 ```ts
-import { X, Instagram, Facebook, LinkedIn } from "universal-social-sdk";
+import {
+  X,
+  Instagram,
+  Facebook,
+  LinkedIn,
+  YouTube,
+  TikTok,
+  Pinterest,
+  Bluesky,
+  Mastodon,
+  Threads
+} from "universal-social-sdk";
 ```
 
 At runtime:
@@ -68,7 +79,7 @@ npx universal-social-sdk update
 ```
 
 - `init` helps first-time setup.
-- `update` runs the docs-to-patch flow with local Ollama.
+- `update` runs the docs-to-patch flow with a local model runtime.
 
 ## 6) CI and release model
 

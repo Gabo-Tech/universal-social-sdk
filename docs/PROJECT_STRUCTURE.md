@@ -14,6 +14,12 @@ This document explains how `universal-social-sdk` is organized and where each re
     - `facebook.ts`
     - `instagram.ts`
     - `linkedin.ts`
+    - `youtube.ts`
+    - `tiktok.ts`
+    - `pinterest.ts`
+    - `bluesky.ts`
+    - `mastodon.ts`
+    - `threads.ts`
   - These classes define the public SDK methods.
   - All methods are static async methods.
 
@@ -44,7 +50,7 @@ This document explains how `universal-social-sdk` is organized and where each re
 
 - `src/updater/`
   - `docCrawler.ts`: pulls official docs and extracts text/tables.
-  - `ollama.ts`: prompts local Ollama model and parses patch plan.
+  - `ollama.ts`: prompts a local model runtime and parses patch plan.
   - `patcher.ts`: computes diffs and applies safe, path-restricted file updates.
 
 - `tests/`

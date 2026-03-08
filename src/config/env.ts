@@ -39,6 +39,35 @@ export const env = {
     personUrn: process.env.LINKEDIN_PERSON_URN ?? "",
     apiVersion: process.env.LINKEDIN_API_VERSION ?? "202510"
   },
+  youtube: {
+    accessToken: process.env.YOUTUBE_ACCESS_TOKEN ?? "",
+    channelId: process.env.YOUTUBE_CHANNEL_ID ?? ""
+  },
+  tiktok: {
+    accessToken: process.env.TIKTOK_ACCESS_TOKEN ?? "",
+    openId: process.env.TIKTOK_OPEN_ID ?? "",
+    advertiserId: process.env.TIKTOK_ADVERTISER_ID ?? ""
+  },
+  pinterest: {
+    accessToken: process.env.PINTEREST_ACCESS_TOKEN ?? "",
+    boardId: process.env.PINTEREST_BOARD_ID ?? ""
+  },
+  bluesky: {
+    serviceUrl: process.env.BLUESKY_SERVICE_URL ?? "https://bsky.social",
+    identifier: process.env.BLUESKY_IDENTIFIER ?? "",
+    appPassword: process.env.BLUESKY_APP_PASSWORD ?? "",
+    accessJwt: process.env.BLUESKY_ACCESS_JWT ?? "",
+    refreshJwt: process.env.BLUESKY_REFRESH_JWT ?? ""
+  },
+  mastodon: {
+    baseUrl: process.env.MASTODON_BASE_URL ?? "",
+    accessToken: process.env.MASTODON_ACCESS_TOKEN ?? "",
+    accountId: process.env.MASTODON_ACCOUNT_ID ?? ""
+  },
+  threads: {
+    accessToken: process.env.THREADS_ACCESS_TOKEN ?? "",
+    userId: process.env.THREADS_USER_ID ?? ""
+  },
   retry: {
     maxRetries: readNumberEnv("SOCIAL_SDK_MAX_RETRIES", 3),
     baseDelayMs: readNumberEnv("SOCIAL_SDK_RETRY_BASE_MS", 500)
