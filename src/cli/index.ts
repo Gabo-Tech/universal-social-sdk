@@ -6,6 +6,35 @@ import { runUpdateCommand } from "./commands/update.js";
 
 const program = new Command();
 
+function formatCliError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function parseCsv(value?: string): string[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+function parseOptionalPositiveInt(value?: string): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined;
+  }
+  return Math.floor(parsed);
+}
+
 program
   .name("universal-social-sdk")
   .description("Universal social media SDK CLI")
@@ -19,7 +48,7 @@ program
       await runInitCommand(process.cwd());
     } catch (error) {
       console.error(chalk.red("Initialization failed."));
-      console.error(error);
+      console.error(chalk.red(formatCliError(error)));
       process.exitCode = 1;
     }
   });
@@ -30,6 +59,14 @@ program
   .option("--dry-run", "Preview changes without writing files")
   .option("-y, --yes", "Apply changes without confirmation prompt")
   .option("--model <name>", "Override Ollama model for this run")
+  .option(
+    "--fallback-models <csv>",
+    "Comma-separated fallback model chain for OpenRouter"
+  )
+  .option(
+    "--max-model-attempts <number>",
+    "Max model attempts for OpenRouter fallback chain"
+  )
   .option("--ci", "Run in non-interactive CI mode")
   .option("--open-pr", "Prepare PR artifacts for workflow automation")
   .option(
@@ -48,6 +85,8 @@ program
       dryRun?: boolean;
       yes?: boolean;
       model?: string;
+      fallbackModels?: string;
+      maxModelAttempts?: string;
       ci?: boolean;
       openPr?: boolean;
       branchPrefix?: string;
@@ -59,6 +98,8 @@ program
         dryRun: options.dryRun,
         yes: options.yes,
         model: options.model,
+        fallbackModels: parseCsv(options.fallbackModels),
+        maxModelAttempts: parseOptionalPositiveInt(options.maxModelAttempts),
         ci: options.ci,
         openPr: options.openPr,
         branchPrefix: options.branchPrefix,
@@ -67,7 +108,7 @@ program
       });
     } catch (error) {
       console.error(chalk.red("Update failed."));
-      console.error(error);
+      console.error(chalk.red(formatCliError(error)));
       process.exitCode = 1;
     }
     }

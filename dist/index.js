@@ -9,6 +9,21 @@ function readNumberEnv(name, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
+function readListEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    return [];
+  }
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+function resolveLlmProvider() {
+  const provider = process.env.UPDATER_LLM_PROVIDER;
+  if (provider === "openrouter" || provider === "ollama") {
+    return provider;
+  }
+  return process.env.UPDATER_LLM_API_KEY || process.env.OPENROUTER_API_KEY ? "openrouter" : "ollama";
+}
+var llmProvider = resolveLlmProvider();
 var env = {
   x: {
     apiKey: process.env.X_API_KEY ?? "",
@@ -69,6 +84,22 @@ var env = {
   retry: {
     maxRetries: readNumberEnv("SOCIAL_SDK_MAX_RETRIES", 3),
     baseDelayMs: readNumberEnv("SOCIAL_SDK_RETRY_BASE_MS", 500)
+  },
+  llm: {
+    provider: llmProvider,
+    baseUrl: process.env.UPDATER_LLM_BASE_URL ?? "https://openrouter.ai/api/v1",
+    apiKey: process.env.UPDATER_LLM_API_KEY ?? process.env.OPENROUTER_API_KEY ?? "",
+    model: process.env.UPDATER_LLM_MODEL ?? process.env.OPENROUTER_MODEL ?? process.env.OLLAMA_MODEL ?? (llmProvider === "openrouter" ? "google/gemma-3-4b-it:free" : "llama3.2:3b"),
+    appName: process.env.UPDATER_LLM_APP_NAME ?? "universal-social-sdk-updater",
+    appUrl: process.env.UPDATER_LLM_APP_URL ?? "https://github.com/Gabo-Tech/universal-social-sdk",
+    maxTokens: readNumberEnv("UPDATER_LLM_MAX_TOKENS", 1200),
+    maxDocCharsPerPage: readNumberEnv("UPDATER_LLM_MAX_DOC_CHARS_PER_PAGE", 6e3),
+    maxEndpointRowsPerPage: readNumberEnv(
+      "UPDATER_LLM_MAX_ENDPOINT_ROWS_PER_PAGE",
+      40
+    ),
+    fallbackModels: readListEnv("UPDATER_LLM_FALLBACK_MODELS"),
+    maxModelAttempts: readNumberEnv("UPDATER_LLM_MAX_MODEL_ATTEMPTS", 4)
   },
   ollama: {
     host: process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434",

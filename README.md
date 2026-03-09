@@ -192,8 +192,19 @@ router.on("x.tweet_create_events", async (event) => {
 
 - `SOCIAL_SDK_MAX_RETRIES` (default `3`)
 - `SOCIAL_SDK_RETRY_BASE_MS` (default `500`)
-- `OLLAMA_HOST` (default `http://127.0.0.1:11434`)
-- `OLLAMA_MODEL` (default `llama3.2:3b`)
+- `UPDATER_LLM_PROVIDER` (`openrouter` or `ollama`, default `openrouter` when API key is present, otherwise `ollama`)
+- `UPDATER_LLM_BASE_URL` (default `https://openrouter.ai/api/v1`)
+- `UPDATER_LLM_API_KEY` (or `OPENROUTER_API_KEY`)
+- `UPDATER_LLM_MODEL` (or `OPENROUTER_MODEL`, default `google/gemma-3-4b-it:free` for OpenRouter, `llama3.2:3b` for Ollama)
+- `UPDATER_LLM_APP_NAME` (optional request metadata)
+- `UPDATER_LLM_APP_URL` (optional request metadata)
+- `UPDATER_LLM_MAX_TOKENS` (default `1200`)
+- `UPDATER_LLM_MAX_DOC_CHARS_PER_PAGE` (default `6000`)
+- `UPDATER_LLM_MAX_ENDPOINT_ROWS_PER_PAGE` (default `40`)
+- `UPDATER_LLM_MAX_MODEL_ATTEMPTS` (default `4`)
+- `UPDATER_LLM_FALLBACK_MODELS` (comma-separated OpenRouter model IDs used after primary model fails)
+- `OLLAMA_HOST` (legacy local runtime support, default `http://127.0.0.1:11434`)
+- `OLLAMA_MODEL` (legacy local runtime support)
 
 ## CLI
 
@@ -218,6 +229,8 @@ npx universal-social-sdk update
 ```bash
 npx universal-social-sdk update --dry-run
 npx universal-social-sdk update --model llama3.2
+npx universal-social-sdk update --fallback-models "google/gemma-3-4b-it:free,qwen/qwen3-4b:free"
+npx universal-social-sdk update --max-model-attempts 5
 npx universal-social-sdk update --yes
 npx universal-social-sdk update --ci --open-pr --base main --branch-prefix chore/updater
 ```
@@ -226,10 +239,12 @@ Flow:
 
 1. Crawls official docs pages for X, Meta Graph API, Instagram Graph API, and LinkedIn.
 2. Extracts clean text and table-like endpoint data with Cheerio.
-3. Sends doc snapshots to your local model runtime.
+3. Sends doc snapshots to your configured LLM provider (OpenRouter or local runtime).
+   - In OpenRouter mode, retries across a fallback model chain for `402/404/408/429` model-level failures with a short backoff between attempts.
 4. Requests generated method updates + full TypeScript file content.
-5. Shows git-style diffs and asks for confirmation.
-6. Applies patches and rebuilds package.
+5. Runs safety checks to reject suspicious placeholder rewrites or destructive class replacements.
+6. Shows git-style diffs and asks for confirmation.
+7. Applies patches and rebuilds package.
 
 CI/PR mode writes deterministic artifacts in `.artifacts/`:
 
@@ -418,5 +433,15 @@ Configure this repository secret for publishing:
 
 Configure this repository secret for scheduled updater PRs:
 
-- `OLLAMA_HOST` (required; endpoint reachable from GitHub Actions runner)
-- `OLLAMA_MODEL` (optional override)
+- `UPDATER_LLM_PROVIDER` (`openrouter` or `ollama`)
+- `UPDATER_LLM_API_KEY` (required for `openrouter`; or use `OPENROUTER_API_KEY`)
+- `UPDATER_LLM_MODEL` (optional)
+- `UPDATER_LLM_BASE_URL` (optional; defaults to OpenRouter URL)
+- `UPDATER_LLM_MAX_TOKENS` (optional; cap completion size/cost)
+- `UPDATER_LLM_MAX_MODEL_ATTEMPTS` (optional)
+- `UPDATER_LLM_FALLBACK_MODELS` (optional comma-separated model chain)
+
+Alternative OpenRouter-compatible secret names also supported:
+
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL`

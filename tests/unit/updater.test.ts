@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { hasMaterialChanges } from "../../src/cli/commands/update.js";
+import {
+  hasMaterialChanges,
+  validateUpdaterPlanSafety
+} from "../../src/cli/commands/update.js";
 import { parseJsonOutput } from "../../src/updater/ollama.js";
 
 describe("updater plan validation", () => {
@@ -50,5 +53,41 @@ describe("updater no-change behavior", () => {
     expect(result.hasChanges).toBe(false);
     expect(result.hasFileChanges).toBe(false);
     expect(result.methodsChanged).toBe(false);
+  });
+});
+
+describe("updater plan safety checks", () => {
+  it("rejects suspicious placeholder rewrites", () => {
+    const result = validateUpdaterPlanSafety([
+      {
+        path: "src/platforms/x.ts",
+        absolutePath: "/tmp/x.ts",
+        before: Array.from({ length: 250 }, (_, i) => `line-${i}`).join("\n"),
+        after: [
+          "// This file needs to be updated",
+          "import { XApi } from './api';",
+          "export class XPlatform extends XApi {}"
+        ].join("\n"),
+        diff: ""
+      }
+    ]);
+
+    expect(result.safe).toBe(false);
+    expect(result.findings.some((item) => item.includes("suspicious"))).toBe(true);
+  });
+
+  it("accepts normal platform updates with stable class names", () => {
+    const result = validateUpdaterPlanSafety([
+      {
+        path: "src/platforms/x.ts",
+        absolutePath: "/tmp/x.ts",
+        before: "export class X { static async postTweet() {} }\n",
+        after: "export class X { static async postTweet() {} static async pinTweet() {} }\n",
+        diff: ""
+      }
+    ]);
+
+    expect(result.safe).toBe(true);
+    expect(result.findings).toEqual([]);
   });
 });

@@ -12,6 +12,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Non-interactive updater mode for CI/automation (`--ci`, `--open-pr`, `--branch-prefix`, `--base`, `--artifacts-dir`).
 - Structured updater artifacts (`.artifacts/update-plan.json`, `.artifacts/update-diff-summary.json`, `.artifacts/pr-title.txt`, `.artifacts/pr-body.md`).
 - Strict Ollama patch-plan schema validation with typed `changes` metadata (platform, endpoint, change type, confidence).
+- Updater LLM provider abstraction with OpenRouter support (`UPDATER_LLM_*`, `OPENROUTER_*`) while keeping legacy Ollama compatibility.
 - Scheduled PR automation workflow: `.github/workflows/auto-update-pr.yml`.
 - Workflow-dispatch `dry_run` mode for updater automation (detect and generate artifacts without opening PRs).
 - Unit tests covering updater plan validation and no-change detection behavior.

@@ -14,6 +14,8 @@ export interface UpdateCommandOptions {
   dryRun?: boolean;
   yes?: boolean;
   model?: string;
+  fallbackModels?: string[];
+  maxModelAttempts?: number;
   ci?: boolean;
   openPr?: boolean;
   branchPrefix?: string;
@@ -74,6 +76,76 @@ function parseExistingMethods(methodsJson: string): Record<string, string[]> {
   } catch {
     return {};
   }
+}
+
+function expectedPlatformClassName(filePath: string): string | null {
+  const match = filePath.match(/^src\/platforms\/([^/]+)\.ts$/);
+  if (!match) {
+    return null;
+  }
+  const slug = match[1];
+  const bySlug: Record<string, string> = {
+    x: "X",
+    instagram: "Instagram",
+    facebook: "Facebook",
+    linkedin: "LinkedIn",
+    youtube: "YouTube",
+    tiktok: "TikTok",
+    pinterest: "Pinterest",
+    bluesky: "Bluesky",
+    mastodon: "Mastodon",
+    threads: "Threads"
+  };
+  return bySlug[slug] ?? null;
+}
+
+export function validateUpdaterPlanSafety(diffs: PlannedDiff[]): {
+  safe: boolean;
+  findings: string[];
+} {
+  const findings: string[] = [];
+  const suspiciousSnippets = [
+    "Placeholder for implementation",
+    "This file needs to be updated",
+    "... other methods ...",
+    "from './api'"
+  ];
+
+  for (const diff of diffs) {
+    if (!diff.path.startsWith("src/platforms/")) {
+      continue;
+    }
+    const beforeLines = diff.before.split(/\r?\n/).length;
+    const afterLines = diff.after.split(/\r?\n/).length;
+    const shrinkRatio = beforeLines > 0 ? afterLines / beforeLines : 1;
+
+    if (beforeLines >= 120 && shrinkRatio < 0.4) {
+      findings.push(
+        `${diff.path}: suspicious large rewrite (${beforeLines} -> ${afterLines} lines).`
+      );
+    }
+
+    for (const snippet of suspiciousSnippets) {
+      if (diff.after.includes(snippet)) {
+        findings.push(`${diff.path}: suspicious snippet detected (${snippet}).`);
+      }
+    }
+
+    const className = expectedPlatformClassName(diff.path);
+    if (className) {
+      const classRegex = new RegExp(`\\bexport\\s+class\\s+${className}\\b`);
+      if (!classRegex.test(diff.after)) {
+        findings.push(
+          `${diff.path}: expected exported class '${className}' was not found.`
+        );
+      }
+    }
+  }
+
+  return {
+    safe: findings.length === 0,
+    findings
+  };
 }
 
 export function hasMaterialChanges(params: {
@@ -237,7 +309,9 @@ export async function runUpdateCommand(
   const plan = await askOllamaForPatchPlan({
     docs,
     existingMethodsJson: methodsJson,
-    model: options.model
+    model: options.model,
+    fallbackModels: options.fallbackModels,
+    maxModelAttempts: options.maxModelAttempts
   });
   planSpinner.succeed("Update plan generated.");
 
@@ -256,6 +330,13 @@ export async function runUpdateCommand(
     rootDir: cwd,
     files: generatedFiles
   });
+  const safety = validateUpdaterPlanSafety(diffs);
+  if (!safety.safe) {
+    const topFindings = safety.findings.slice(0, 8).join(" | ");
+    throw new Error(
+      `Updater plan rejected by safety checks. ${topFindings}`
+    );
+  }
   const changeStats = hasMaterialChanges({
     diffs,
     existingMethods,

@@ -80,6 +80,7 @@ npx universal-social-sdk update
 
 - `init` helps first-time setup.
 - `update` runs the docs-to-patch flow with a local model runtime.
+- `update` supports OpenRouter or local runtime provider configuration via updater env vars.
 - `update --ci --open-pr` runs non-interactive mode for automation and writes PR artifacts to `.artifacts/`.
 
 ## 6) CI and release model
@@ -96,7 +97,7 @@ npx universal-social-sdk update
   - Runs on schedule/manual dispatch.
   - Executes updater in CI PR mode, validates build/tests, then opens a PR if changes exist.
   - Supports `workflow_dispatch` dry-run input for detection-only runs (no branch/PR).
-  - Requires `OLLAMA_HOST` secret (and optional `OLLAMA_MODEL`).
+  - Requires updater LLM secrets (OpenRouter recommended in hosted CI).
 
 ## 7) Publish checklist
 

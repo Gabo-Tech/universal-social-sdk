@@ -235,7 +235,7 @@ async function crawlAllDocs() {
 }
 
 // src/updater/ollama.ts
-import axios2 from "axios";
+import axios2, { isAxiosError } from "axios";
 import { z } from "zod";
 
 // src/config/env.ts
@@ -249,6 +249,21 @@ function readNumberEnv(name, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
+function readListEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    return [];
+  }
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+function resolveLlmProvider() {
+  const provider = process.env.UPDATER_LLM_PROVIDER;
+  if (provider === "openrouter" || provider === "ollama") {
+    return provider;
+  }
+  return process.env.UPDATER_LLM_API_KEY || process.env.OPENROUTER_API_KEY ? "openrouter" : "ollama";
+}
+var llmProvider = resolveLlmProvider();
 var env = {
   x: {
     apiKey: process.env.X_API_KEY ?? "",
@@ -310,6 +325,22 @@ var env = {
     maxRetries: readNumberEnv("SOCIAL_SDK_MAX_RETRIES", 3),
     baseDelayMs: readNumberEnv("SOCIAL_SDK_RETRY_BASE_MS", 500)
   },
+  llm: {
+    provider: llmProvider,
+    baseUrl: process.env.UPDATER_LLM_BASE_URL ?? "https://openrouter.ai/api/v1",
+    apiKey: process.env.UPDATER_LLM_API_KEY ?? process.env.OPENROUTER_API_KEY ?? "",
+    model: process.env.UPDATER_LLM_MODEL ?? process.env.OPENROUTER_MODEL ?? process.env.OLLAMA_MODEL ?? (llmProvider === "openrouter" ? "google/gemma-3-4b-it:free" : "llama3.2:3b"),
+    appName: process.env.UPDATER_LLM_APP_NAME ?? "universal-social-sdk-updater",
+    appUrl: process.env.UPDATER_LLM_APP_URL ?? "https://github.com/Gabo-Tech/universal-social-sdk",
+    maxTokens: readNumberEnv("UPDATER_LLM_MAX_TOKENS", 1200),
+    maxDocCharsPerPage: readNumberEnv("UPDATER_LLM_MAX_DOC_CHARS_PER_PAGE", 6e3),
+    maxEndpointRowsPerPage: readNumberEnv(
+      "UPDATER_LLM_MAX_ENDPOINT_ROWS_PER_PAGE",
+      40
+    ),
+    fallbackModels: readListEnv("UPDATER_LLM_FALLBACK_MODELS"),
+    maxModelAttempts: readNumberEnv("UPDATER_LLM_MAX_MODEL_ATTEMPTS", 4)
+  },
   ollama: {
     host: process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434",
     model: process.env.OLLAMA_MODEL ?? "llama3.2:3b"
@@ -337,19 +368,68 @@ var ollamaPatchPlanSchema = z.object({
   ),
   readmeTable: z.string()
 });
+var OpenRouterRequestError = class extends Error {
+  status;
+  canRetryWithAnotherModel;
+  constructor(params) {
+    super(params.message);
+    this.name = "OpenRouterRequestError";
+    this.status = params.status;
+    this.canRetryWithAnotherModel = params.canRetryWithAnotherModel;
+  }
+};
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function truncate(text, maxChars) {
+  if (text.length <= maxChars) {
+    return text;
+  }
+  if (maxChars < 80) {
+    return text.slice(0, maxChars);
+  }
+  const head = Math.floor(maxChars * 0.75);
+  const tail = Math.max(0, maxChars - head - 32);
+  return `${text.slice(0, head)}
+...[truncated]...
+${text.slice(text.length - tail)}`;
+}
+function compactDocs(docs) {
+  return docs.map((doc) => {
+    const limitedRows = doc.endpointRows.slice(0, env.llm.maxEndpointRowsPerPage).map(
+      (row) => Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [
+          key,
+          truncate(String(value), 200)
+        ])
+      )
+    );
+    const text = truncate(doc.text, env.llm.maxDocCharsPerPage);
+    return {
+      url: doc.url,
+      title: doc.title,
+      text,
+      endpointRows: limitedRows,
+      truncated: text.length < doc.text.length || limitedRows.length < doc.endpointRows.length
+    };
+  });
+}
 function buildPrompt(docs, existingMethodsJson) {
+  const compactedDocs = compactDocs(docs);
+  const compactedMethods = truncate(existingMethodsJson, 1e5);
   return [
     "You are maintaining universal-social-sdk.",
     "Compare the crawled docs with current methods and identify NEW or CHANGED endpoints.",
     "Focus areas: content publishing, stories, reels, comments, DMs, analytics.",
+    "Crawled text may be truncated. Only report high-confidence changes.",
     "Output STRICT JSON with this shape only:",
     '{"summary": string, "updatedMethods": Record<string,string[]>, "changes": [{"platform": string, "endpoint": string, "changeType": "added|modified|deprecated|removed", "confidence": number, "notes"?: string}], "files": [{"path": string, "content": string}], "readmeTable": string}',
     "Files must target src/platforms/*.ts and supported-methods.json updates when needed.",
     "Each file.content must be complete TypeScript file content, not patch snippets.",
     "Current supported-methods.json:",
-    existingMethodsJson,
+    compactedMethods,
     "Crawled docs:",
-    JSON.stringify(docs)
+    JSON.stringify(compactedDocs)
   ].join("\n");
 }
 function parseJsonOutput(raw) {
@@ -357,33 +437,136 @@ function parseJsonOutput(raw) {
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start === -1 || end === -1 || end <= start) {
-    throw new Error("Ollama response did not contain a JSON object.");
+    throw new Error("LLM response did not contain a JSON object.");
   }
   const maybeJson = cleaned.slice(start, end + 1);
   const parsed = JSON.parse(maybeJson);
   const result = ollamaPatchPlanSchema.safeParse(parsed);
   if (!result.success) {
     throw new Error(
-      `Ollama patch plan schema validation failed: ${result.error.message}`
+      `Patch plan schema validation failed: ${result.error.message}`
     );
   }
   return result.data;
 }
-async function askOllamaForPatchPlan(params) {
-  const model = params.model || env.ollama.model || "llama3.2:3b";
-  const prompt = buildPrompt(params.docs, params.existingMethodsJson);
+async function askViaOllama(params) {
   const response = await axios2.post(
     `${env.ollama.host}/api/generate`,
     {
-      model,
-      prompt,
+      model: params.model,
+      prompt: params.prompt,
       stream: false
     },
     {
       timeout: 12e4
     }
   );
-  return parseJsonOutput(response.data.response);
+  return response.data.response;
+}
+async function askViaOpenRouter(params) {
+  if (!env.llm.apiKey) {
+    throw new Error(
+      "Missing updater API key. Set UPDATER_LLM_API_KEY (or OPENROUTER_API_KEY)."
+    );
+  }
+  let response;
+  try {
+    response = await axios2.post(
+      `${env.llm.baseUrl.replace(/\/$/, "")}/chat/completions`,
+      {
+        model: params.model,
+        messages: [
+          {
+            role: "user",
+            content: params.prompt
+          }
+        ],
+        temperature: 0,
+        max_tokens: env.llm.maxTokens
+      },
+      {
+        timeout: 12e4,
+        headers: {
+          Authorization: `Bearer ${env.llm.apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": env.llm.appUrl,
+          "X-Title": env.llm.appName
+        }
+      }
+    );
+  } catch (error) {
+    if (!isAxiosError(error)) {
+      throw error;
+    }
+    const status = error.response?.status;
+    const responseBody = error.response?.data;
+    const providerMessage = typeof responseBody === "string" ? responseBody : responseBody?.error?.message ?? responseBody?.message ?? "";
+    const hint = status === 401 || status === 403 ? "Verify UPDATER_LLM_API_KEY permissions." : status === 402 ? "Your provider account/model likely requires billing or has no quota." : status === 404 ? "Model or endpoint not found. Verify UPDATER_LLM_MODEL and base URL." : status === 429 ? "Rate-limited by provider. Retry later or switch to a less busy model." : status === 413 ? "Prompt payload too large. Reduce UPDATER_LLM_MAX_DOC_CHARS_PER_PAGE." : "Check provider status and updater LLM configuration.";
+    throw new OpenRouterRequestError({
+      message: `OpenRouter request failed${status ? ` (${status})` : ""}. ${providerMessage || hint}`,
+      status,
+      canRetryWithAnotherModel: status === 402 || status === 404 || status === 408 || status === 429
+    });
+  }
+  const content = response.data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("OpenRouter did not return a message content payload.");
+  }
+  return content;
+}
+function buildModelChain(params) {
+  const fromEnv = params.fallbackModels ?? env.llm.fallbackModels;
+  const defaults = [
+    "google/gemma-3-4b-it:free",
+    "qwen/qwen3-4b:free",
+    "openai/gpt-oss-20b:free"
+  ];
+  const all = [params.primaryModel, ...fromEnv, ...defaults];
+  const maxAttempts = Math.max(
+    1,
+    params.maxModelAttempts ?? env.llm.maxModelAttempts
+  );
+  return [...new Set(all.filter(Boolean))].slice(
+    0,
+    maxAttempts
+  );
+}
+async function askOllamaForPatchPlan(params) {
+  const provider = env.llm.provider;
+  const model = params.model || env.llm.model || env.ollama.model || "llama3.2:3b";
+  const prompt = buildPrompt(params.docs, params.existingMethodsJson);
+  if (provider !== "openrouter") {
+    const raw = await askViaOllama({ prompt, model });
+    return parseJsonOutput(raw);
+  }
+  const attempts = buildModelChain({
+    primaryModel: model,
+    fallbackModels: params.fallbackModels,
+    maxModelAttempts: params.maxModelAttempts
+  });
+  const failures = [];
+  const fallbackDelayMs = 750;
+  for (const [index, candidate] of attempts.entries()) {
+    try {
+      const raw = await askViaOpenRouter({ prompt, model: candidate });
+      return parseJsonOutput(raw);
+    } catch (error) {
+      if (error instanceof OpenRouterRequestError) {
+        failures.push(`${candidate}: ${error.message}`);
+        if (!error.canRetryWithAnotherModel) {
+          throw error;
+        }
+        if (index < attempts.length - 1) {
+          await sleep(fallbackDelayMs);
+        }
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error(
+    `All OpenRouter models failed (${attempts.length} attempts). ${failures.join(" | ")}`
+  );
 }
 
 // src/updater/patcher.ts
@@ -486,6 +669,66 @@ function parseExistingMethods(methodsJson) {
   } catch {
     return {};
   }
+}
+function expectedPlatformClassName(filePath) {
+  const match = filePath.match(/^src\/platforms\/([^/]+)\.ts$/);
+  if (!match) {
+    return null;
+  }
+  const slug = match[1];
+  const bySlug = {
+    x: "X",
+    instagram: "Instagram",
+    facebook: "Facebook",
+    linkedin: "LinkedIn",
+    youtube: "YouTube",
+    tiktok: "TikTok",
+    pinterest: "Pinterest",
+    bluesky: "Bluesky",
+    mastodon: "Mastodon",
+    threads: "Threads"
+  };
+  return bySlug[slug] ?? null;
+}
+function validateUpdaterPlanSafety(diffs) {
+  const findings = [];
+  const suspiciousSnippets = [
+    "Placeholder for implementation",
+    "This file needs to be updated",
+    "... other methods ...",
+    "from './api'"
+  ];
+  for (const diff of diffs) {
+    if (!diff.path.startsWith("src/platforms/")) {
+      continue;
+    }
+    const beforeLines = diff.before.split(/\r?\n/).length;
+    const afterLines = diff.after.split(/\r?\n/).length;
+    const shrinkRatio = beforeLines > 0 ? afterLines / beforeLines : 1;
+    if (beforeLines >= 120 && shrinkRatio < 0.4) {
+      findings.push(
+        `${diff.path}: suspicious large rewrite (${beforeLines} -> ${afterLines} lines).`
+      );
+    }
+    for (const snippet of suspiciousSnippets) {
+      if (diff.after.includes(snippet)) {
+        findings.push(`${diff.path}: suspicious snippet detected (${snippet}).`);
+      }
+    }
+    const className = expectedPlatformClassName(diff.path);
+    if (className) {
+      const classRegex = new RegExp(`\\bexport\\s+class\\s+${className}\\b`);
+      if (!classRegex.test(diff.after)) {
+        findings.push(
+          `${diff.path}: expected exported class '${className}' was not found.`
+        );
+      }
+    }
+  }
+  return {
+    safe: findings.length === 0,
+    findings
+  };
 }
 function hasMaterialChanges(params) {
   const hasFileChanges = params.diffs.some((diff) => diff.before !== diff.after);
@@ -599,7 +842,9 @@ async function runUpdateCommand(cwd, options = {}) {
   const plan = await askOllamaForPatchPlan({
     docs,
     existingMethodsJson: methodsJson,
-    model: options.model
+    model: options.model,
+    fallbackModels: options.fallbackModels,
+    maxModelAttempts: options.maxModelAttempts
   });
   planSpinner.succeed("Update plan generated.");
   const generatedFiles = [...plan.files];
@@ -616,6 +861,13 @@ async function runUpdateCommand(cwd, options = {}) {
     rootDir: cwd,
     files: generatedFiles
   });
+  const safety = validateUpdaterPlanSafety(diffs);
+  if (!safety.safe) {
+    const topFindings = safety.findings.slice(0, 8).join(" | ");
+    throw new Error(
+      `Updater plan rejected by safety checks. ${topFindings}`
+    );
+  }
   const changeStats = hasMaterialChanges({
     diffs,
     existingMethods,
@@ -700,17 +952,46 @@ async function runUpdateCommand(cwd, options = {}) {
 
 // src/cli/index.ts
 var program = new Command();
+function formatCliError(error) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+function parseCsv(value) {
+  if (!value) {
+    return void 0;
+  }
+  const parsed = value.split(",").map((item) => item.trim()).filter(Boolean);
+  return parsed.length > 0 ? parsed : void 0;
+}
+function parseOptionalPositiveInt(value) {
+  if (!value) {
+    return void 0;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return void 0;
+  }
+  return Math.floor(parsed);
+}
 program.name("universal-social-sdk").description("Universal social media SDK CLI").version("1.1.0");
 program.command("init").description("Create .env.example and show OAuth setup links").action(async () => {
   try {
     await runInitCommand(process.cwd());
   } catch (error) {
     console.error(chalk3.red("Initialization failed."));
-    console.error(error);
+    console.error(chalk3.red(formatCliError(error)));
     process.exitCode = 1;
   }
 });
-program.command("update").description("Crawl docs + run local Ollama + patch SDK sources").option("--dry-run", "Preview changes without writing files").option("-y, --yes", "Apply changes without confirmation prompt").option("--model <name>", "Override Ollama model for this run").option("--ci", "Run in non-interactive CI mode").option("--open-pr", "Prepare PR artifacts for workflow automation").option(
+program.command("update").description("Crawl docs + run local Ollama + patch SDK sources").option("--dry-run", "Preview changes without writing files").option("-y, --yes", "Apply changes without confirmation prompt").option("--model <name>", "Override Ollama model for this run").option(
+  "--fallback-models <csv>",
+  "Comma-separated fallback model chain for OpenRouter"
+).option(
+  "--max-model-attempts <number>",
+  "Max model attempts for OpenRouter fallback chain"
+).option("--ci", "Run in non-interactive CI mode").option("--open-pr", "Prepare PR artifacts for workflow automation").option(
   "--branch-prefix <prefix>",
   "Branch prefix for updater PR metadata",
   "chore/updater"
@@ -725,6 +1006,8 @@ program.command("update").description("Crawl docs + run local Ollama + patch SDK
         dryRun: options.dryRun,
         yes: options.yes,
         model: options.model,
+        fallbackModels: parseCsv(options.fallbackModels),
+        maxModelAttempts: parseOptionalPositiveInt(options.maxModelAttempts),
         ci: options.ci,
         openPr: options.openPr,
         branchPrefix: options.branchPrefix,
@@ -733,7 +1016,7 @@ program.command("update").description("Crawl docs + run local Ollama + patch SDK
       });
     } catch (error) {
       console.error(chalk3.red("Update failed."));
-      console.error(error);
+      console.error(chalk3.red(formatCliError(error)));
       process.exitCode = 1;
     }
   }
