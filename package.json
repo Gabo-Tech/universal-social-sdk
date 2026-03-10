@@ -7,7 +7,7 @@
   "author": "universal-social-sdk contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Gabo-Tech/universal-social-sdk.git"
+    "url": "git+https://github.com/Gabo-Tech/universal-social-sdk.git"
   },
   "homepage": "https://github.com/Gabo-Tech/universal-social-sdk#readme",
   "bugs": {
@@ -50,7 +50,7 @@
     "supported-methods.json"
   ],
   "bin": {
-    "universal-social-sdk": "./dist/cli/index.js"
+    "universal-social-sdk": "dist/cli/index.js"
   },
   "scripts": {
     "build": "tsup",
